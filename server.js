@@ -110,7 +110,7 @@ const ensureAdminUser = () => {
 ensureAdminUser();
 
 const app = express();
-const PORT = 3e3;
+const PORT = parseInt(process.env.PORT) || 3003;
 app.use(express.json());
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
