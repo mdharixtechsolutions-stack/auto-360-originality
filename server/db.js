@@ -477,11 +477,11 @@ export function readDb() {
 }
 export function writeDb(data) {
   dbCache = data;
-  fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), "utf-8", (err) => {
-    if (err) {
-      console.error("Failed to write db.json asynchronously:", err);
-    }
-  });
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to write db.json synchronously:", err);
+  }
 }
 export function getNextSupplierId() {
   const db = readDb();
