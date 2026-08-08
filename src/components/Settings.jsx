@@ -18,7 +18,7 @@ import { hasModulePermission } from "../lib/permissions";
 import { useLanguage } from "../localization/LanguageContext";
 import { INDIAN_STATES } from "../data/indianStates";
 
-export default function Settings({ initialTab, currentUser, businessProfile, setBusinessProfile }) {
+export default function Settings({ initialTab, currentUser, businessProfile, setBusinessProfile, onRefreshData }) {
   const [activeSection, setActiveSection] = useState(initialTab || "general");
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -78,6 +78,7 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
               businessProfile={businessProfile} 
               setBusinessProfile={setBusinessProfile} 
               showToast={showToast} 
+              onRefreshData={onRefreshData}
             />
           )}
           {activeSection === "profile" && (
@@ -85,6 +86,7 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
               businessProfile={businessProfile} 
               setBusinessProfile={setBusinessProfile} 
               showToast={showToast} 
+              onRefreshData={onRefreshData}
             />
           )}
           {activeSection === "security" && <SecuritySettings />}
@@ -96,7 +98,7 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
       </div>
     </div>;
 }
-function GeneralSettings({ businessProfile, setBusinessProfile, showToast }) {
+function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRefreshData }) {
   const { language, setLanguage, t } = useLanguage();
   const [appName, setAppName] = useState(businessProfile?.companyName || "AUTO360 ERP");
   const [defaultState, setDefaultState] = useState(businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu");
@@ -159,6 +161,7 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast }) {
       const data = await res.json();
       if (data.success && setBusinessProfile) {
         setBusinessProfile(data.business_profile);
+        if (onRefreshData) onRefreshData();
       }
       if (showToast) showToast("General Settings saved successfully! Default State updated.");
     } catch (err) {
@@ -248,7 +251,7 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast }) {
     </form>
   );
 }
-function BusinessProfile({ businessProfile, setBusinessProfile, showToast }) {
+function BusinessProfile({ businessProfile, setBusinessProfile, showToast, onRefreshData }) {
   const [companyName, setCompanyName] = useState(businessProfile?.companyName || "");
   const [companyLogo, setCompanyLogo] = useState(businessProfile?.companyLogo || "");
   const [address, setAddress] = useState(businessProfile?.address || "");
@@ -372,7 +375,8 @@ function BusinessProfile({ businessProfile, setBusinessProfile, showToast }) {
       if (!res.ok) throw new Error("Failed to save company master profile");
       const data = await res.json();
       if (data.success) {
-        setBusinessProfile(data.business_profile);
+        if (setBusinessProfile) setBusinessProfile(data.business_profile);
+        if (onRefreshData) onRefreshData();
         showToast("Company Master settings saved successfully!");
       }
     } catch (err) {

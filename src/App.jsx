@@ -626,6 +626,12 @@ export default function App() {
 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    const titleName = businessProfile?.companyName || "Auto360 ERP";
+    document.title = `${titleName} | Auto Consultancy & Billing`;
+  }, [businessProfile]);
+
   const loadSyncData = useCallback(async () => {
     if (!isLoggedIn) return;
     const safeFetch = async (url) => {
@@ -1677,6 +1683,7 @@ export default function App() {
           currentUser={currentUser}
           businessProfile={businessProfile}
           setBusinessProfile={setBusinessProfile}
+          onRefreshData={loadSyncData}
         />;
       default:
         return <Dashboard
