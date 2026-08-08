@@ -5,6 +5,8 @@ import multer from "multer";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import { connectDB } from "./backend/config/database.js";
 import { seedDatabase } from "./server/seeder.js";
 import {
   readDb,
@@ -16,6 +18,9 @@ import {
   getNextDealId,
   getNextVoucherId
 } from "./server/db.js";
+
+dotenv.config();
+connectDB();
 
 const JWT_SECRET = process.env.JWT_SECRET || "auto360_secret_key_2026";
 

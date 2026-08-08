@@ -49,6 +49,7 @@ echo "🔐 [5/7] Setting up environment variables..."
 if [ ! -f ".env" ]; then
   echo "  Creating .env file..."
   cat > .env << 'ENVEOF'
+MONGODB_URI=mongodb+srv://mdharixtechsolutions_db_user:x1ZBcxPMARJharUV@cluster0.xkk9qnw.mongodb.net/auto360?retryWrites=true&w=majority&appName=Cluster0
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
 APP_URL=https://360auto.harixtechsolutions.com
 ADMIN_SECRET_CODE=HarixTechAdmin2026
