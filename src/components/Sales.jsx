@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Plus, Search, User, Car, FileText, X, Trash2, Printer, Edit2, Eye, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Plus, Search, User, Car, FileText, X, Trash2, Printer, Edit2, Eye, ShieldCheck, CheckCircle2, CreditCard, Share2, Sparkles, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generateCustomerReceiptPDF } from "../lib/receiptPdf";
 import { hasModulePermission } from "../lib/permissions";
+import { calculateDealSalesOutstanding } from "../lib/outstandingCalculator";
+import SalesPosterModal from "./SalesPosterModal";
 
 const mockDeals = [
   {
@@ -35,6 +36,8 @@ export default function Sales({
   vehicles,
   customers,
   deals,
+  payments = [],
+  vouchers = [],
   onUpdateDeals,
   onUpdateVehicles,
   onUpdateCustomers,
@@ -42,7 +45,8 @@ export default function Sales({
   initialVehicle,
   currentUser,
   businessProfile,
-  initialSearch
+  initialSearch,
+  onRefreshData
 }) {
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -50,6 +54,21 @@ export default function Sales({
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState(initialSearch || "");
+
+  const [showPosterModal, setShowPosterModal] = useState(false);
+  const [posterVehicle, setPosterVehicle] = useState(null);
+  const [posterDeal, setPosterDeal] = useState(null);
+
+  const handleOpenPoster = (deal, e) => {
+    if (e) e.stopPropagation();
+    const veh = vehicles.find((v) => v.id === deal.vehicleId || v.purchase_id === deal.vehicleId) || {
+      name: deal.vehicleName,
+      sellingPrice: deal.sellingPrice
+    };
+    setPosterDeal(deal);
+    setPosterVehicle(veh);
+    setShowPosterModal(true);
+  };
 
   useEffect(() => {
     if (initialSearch !== undefined) {
@@ -74,7 +93,10 @@ export default function Sales({
       consultancyFees: deal.consultancyFees || 0,
       aadhaarNumber: deal.aadhaarNumber || "",
       panNumber: deal.panNumber || "",
-      date: deal.date
+      date: deal.date,
+      settlementType: deal.settlementType || (deal.balanceAmount === 0 ? "Fully Paid" : "Customer Balance Pending"),
+      financeName: deal.financeName || "",
+      financeRef: deal.financeRef || ""
     });
     setUploads({
       photo: deal.uploads?.photo || null,
@@ -101,6 +123,7 @@ export default function Sales({
               (v) => v.id === deal.vehicleId ? { ...v, status: "Available" } : v
             ));
           }
+          if (onRefreshData) await onRefreshData();
         } else {
           alert("Failed to delete deal from server");
         }
@@ -112,6 +135,7 @@ export default function Sales({
     }
   };
   const [activeTab, setActiveTab] = useState("all");
+  const [isSaving, setIsSaving] = useState(false);
   const [customerFlow, setCustomerFlow] = useState("existing");
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerMobile, setNewCustomerMobile] = useState("");
@@ -122,12 +146,22 @@ export default function Sales({
   useEffect(() => {
     if (initialVehicle) {
       setSelectedVehicle(initialVehicle);
+      const offerPriceVal = Number(
+        initialVehicle.salesPrice ||
+        initialVehicle.sales_price ||
+        initialVehicle.expectedSellingPrice ||
+        initialVehicle.expected_selling_price ||
+        initialVehicle.offerPrice ||
+        initialVehicle.offer_price ||
+        (Number(initialVehicle.sellingPrice) > 0 ? initialVehicle.sellingPrice : 0) ||
+        (Number(initialVehicle.selling_price) > 0 ? initialVehicle.selling_price : 0)
+      ) || 0;
       setFormData((prev) => ({
         ...prev,
-        sellingPrice: Number(initialVehicle.purchasePrice) || 0,
+        sellingPrice: offerPriceVal,
         expenses: Number(initialVehicle.totalExpenses) || 0,
         consultancyFees: Number(initialVehicle.consultancyFees) || 0,
-        date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+        date: new Date().toISOString().split("T")[0]
       }));
       setShowCreateModal(true);
     }
@@ -142,12 +176,25 @@ export default function Sales({
     }),
     [deals, searchQuery, activeTab, fromDate, toDate]
   );
-  const stats = useMemo(() => ({
-    totalSales: deals.reduce((acc, d) => acc + d.sellingPrice, 0),
-    collections: deals.reduce((acc, d) => acc + d.advanceAmount, 0),
-    pending: deals.reduce((acc, d) => acc + d.balanceAmount, 0),
-    count: deals.length
-  }), [deals]);
+  const stats = useMemo(() => {
+    let totalSales = 0;
+    let collections = 0;
+    let pending = 0;
+
+    filteredDeals.forEach((d) => {
+      const res = calculateDealSalesOutstanding(d, payments, vouchers);
+      totalSales += res.totalSaleValue;
+      collections += res.totalReceived;
+      pending += res.outstanding;
+    });
+
+    return {
+      totalSales,
+      collections,
+      pending,
+      count: filteredDeals.length
+    };
+  }, [filteredDeals, payments, vouchers]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -157,9 +204,14 @@ export default function Sales({
     advanceAmount: 0,
     expenses: 0,
     consultancyFees: 0,
+    commission: 0,
     aadhaarNumber: "",
     panNumber: "",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+    customerRole: "Buyer",
+    date: new Date().toISOString().split("T")[0],
+    settlementType: "Customer Balance Pending",
+    financeName: "",
+    financeRef: ""
   });
   const [uploads, setUploads] = useState({
     photo: null,
@@ -176,17 +228,24 @@ export default function Sales({
     }
   };
   const filteredCustomers = useMemo(() => customers.filter(
-    (c) => !c.isDeleted && (c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile.includes(customerSearch) || c.id && c.id.toLowerCase().includes(customerSearch.toLowerCase()))
-  ), [customers, customerSearch]);
+    (c) => !c.isDeleted && 
+      ((c.customer_type === "Buy" || c.requirement === "Buy" || (c.customer_type !== "Sell" && c.requirement !== "Sell")) || c.id === selectedCustomer?.id) &&
+      (c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile.includes(customerSearch) || (c.id && c.id.toLowerCase().includes(customerSearch.toLowerCase())))
+  ), [customers, customerSearch, selectedCustomer]);
   const filteredVehicles = useMemo(() => vehicles.filter(
     (v) => v.status === "Available" && !v.isDeleted && (v.name.toLowerCase().includes(vehicleSearch.toLowerCase()) || v.regNo.toLowerCase().includes(vehicleSearch.toLowerCase()))
   ), [vehicles, vehicleSearch]);
-  const totalPrice = Number(formData.sellingPrice) + Number(formData.consultancyFees);
-  const balanceAmount = totalPrice - Number(formData.advanceAmount);
-  const purchasePrice = selectedVehicle ? Number(selectedVehicle.purchasePrice) || 0 : 0;
-  const totalExpenses = selectedVehicle ? Number(selectedVehicle.totalExpenses) || 0 : 0;
+  const totalPrice = Number(formData.sellingPrice || 0) + Number(formData.consultancyFees || 0);
+  const balanceAmount = Math.max(0, totalPrice - Number(formData.advanceAmount || 0));
+  const purchasePrice = selectedVehicle ? Number(selectedVehicle.purchasePrice || selectedVehicle.purchase_price) || 0 : 0;
+  const vehicleExpenses = Number(formData.expenses) || (selectedVehicle ? Number(selectedVehicle.totalExpenses) || 0 : 0);
   const consultancyFees = Number(formData.consultancyFees) || 0;
-  const totalVehicleCost = purchasePrice + totalExpenses + consultancyFees;
+  const otherCosts = Number(formData.commission) || 0;
+  const totalVehicleCost = purchasePrice + vehicleExpenses + consultancyFees + otherCosts;
+  const sellingPriceVal = Number(formData.sellingPrice) || 0;
+  const grossProfit = sellingPriceVal - purchasePrice;
+  const netProfit = sellingPriceVal - totalVehicleCost;
+  const profitMarginPercent = totalVehicleCost > 0 ? ((netProfit / totalVehicleCost) * 100).toFixed(2) : "0.00";
   const handleQuickAddCustomer = async () => {
     if (!newCustomerName.trim() || !newCustomerMobile.trim()) {
       alert("Please enter Name and Mobile for quick customer creation");
@@ -201,6 +260,8 @@ export default function Sales({
       area: newCustomerArea.trim(),
       subArea: newCustomerSubArea.trim(),
       address: newCustomerAddress.trim(),
+      customer_type: "Buy",
+      requirement: "Buy",
       isDeleted: false,
       createdBy: "Admin",
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -241,288 +302,175 @@ export default function Sales({
     }
   };
   const handleSaveSale = async () => {
-    if (!selectedCustomer || !selectedVehicle) return;
-    if (editingDeal) {
-      const updatedDeal = {
-        ...editingDeal,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        vehicleId: selectedVehicle.id,
-        vehicleName: selectedVehicle.name,
-        sellingPrice: formData.sellingPrice,
-        totalPrice,
-        advanceAmount: formData.advanceAmount,
-        balanceAmount,
-        consultancyFees: Number(formData.consultancyFees) || 0,
-        status: balanceAmount > 0 ? "Pending" : "Completed",
-        date: formData.date,
-        aadhaarNumber: formData.aadhaarNumber,
-        panNumber: formData.panNumber,
-        uploads: {
-          photo: uploads.photo,
-          aadhaar: uploads.aadhaar,
-          pan: uploads.pan
-        }
-      };
-      try {
+    if (!selectedCustomer || !selectedVehicle) {
+      alert("Please select both a Customer and a Vehicle before saving.");
+      return;
+    }
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const settlementTypeVal = formData.settlementType || (balanceAmount === 0 ? "Fully Paid" : "Customer Balance Pending");
+      const finalBalanceAmount = settlementTypeVal === "Fully Paid" ? 0 : balanceAmount;
+      const statusVal = (settlementTypeVal === "Fully Paid" || settlementTypeVal === "Settled by Finance" || finalBalanceAmount === 0) ? "Completed" : "Pending";
+
+      if (editingDeal) {
+        const updatedDeal = {
+          ...editingDeal,
+          customerId: selectedCustomer.id,
+          customerName: selectedCustomer.name,
+          vehicleId: selectedVehicle.id,
+          vehicleName: selectedVehicle.name,
+          sellingPrice: formData.sellingPrice,
+          totalPrice,
+          advanceAmount: formData.advanceAmount,
+          balanceAmount: finalBalanceAmount,
+          settlementType: settlementTypeVal,
+          financeName: formData.financeName || "",
+          financeRef: formData.financeRef || "",
+          consultancyFees: Number(formData.consultancyFees) || 0,
+          status: statusVal,
+          date: formData.date,
+          aadhaarNumber: formData.aadhaarNumber,
+          panNumber: formData.panNumber,
+          uploads: {
+            photo: uploads.photo,
+            aadhaar: uploads.aadhaar,
+            pan: uploads.pan
+          }
+        };
+
         const res = await fetch(`/api/deals/${editingDeal.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedDeal)
         });
-        if (res.ok) {
-          const saved = await res.json();
-          onUpdateDeals((prev) => prev.map((d) => d.id === editingDeal.id ? saved : d));
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to update sale record on server.");
+        }
+
+        const saved = await res.json();
+        onUpdateDeals((prev) => prev.map((d) => (d.id === editingDeal.id ? saved : d)));
+
+        // Close modal and reset form immediately for instant user feedback
+        setShowCreateModal(false);
+        setEditingDeal(null);
+        setSelectedCustomer(null);
+        setSelectedVehicle(null);
+        setUploads({ photo: null, aadhaar: null, pan: null });
+        setFormData({
+          sellingPrice: 0,
+          advanceAmount: 0,
+          expenses: 0,
+          consultancyFees: 0,
+          aadhaarNumber: "",
+          panNumber: "",
+          date: new Date().toISOString().split("T")[0]
+        });
+
+        // Trigger PDF receipt generation and refresh data asynchronously
+        setTimeout(() => {
           generateReceipt(saved);
-        } else {
-          const err = await res.json();
-          alert("Failed to update sale record: " + (err.error || "Unknown error"));
-        }
-      } catch (err) {
-        console.error("Error updating sale", err);
-        alert("Network error updating sale");
-      }
-      setEditingDeal(null);
-    } else {
-      const payload = {
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        vehicleId: selectedVehicle.id,
-        vehicleName: selectedVehicle.name,
-        type: "Sell",
-        purchasePrice: selectedVehicle.purchasePrice,
-        expenses: selectedVehicle.totalExpenses || 0,
-        sellingPrice: formData.sellingPrice,
-        totalPrice,
-        advanceAmount: formData.advanceAmount,
-        balanceAmount,
-        consultancyFees: Number(formData.consultancyFees) || 0,
-        commission: 0,
-        assignedAgentId: "S-1",
-        agent: "John Staff",
-        status: balanceAmount > 0 ? "Pending" : "Completed",
-        date: formData.date,
-        createdBy: "S-1",
-        aadhaarNumber: formData.aadhaarNumber,
-        panNumber: formData.panNumber,
-        uploads: {
-          photo: uploads.photo,
-          aadhaar: uploads.aadhaar,
-          pan: uploads.pan
-        }
-      };
-      try {
+          if (onRefreshData) onRefreshData().catch(console.error);
+        }, 50);
+
+      } else {
+        const payload = {
+          customerId: selectedCustomer.id,
+          customerName: selectedCustomer.name,
+          vehicleId: selectedVehicle.id,
+          vehicleName: selectedVehicle.name,
+          type: "Sell",
+          purchasePrice: selectedVehicle.purchasePrice || selectedVehicle.purchase_price || 0,
+          expenses: selectedVehicle.totalExpenses || 0,
+          sellingPrice: formData.sellingPrice,
+          totalPrice,
+          advanceAmount: formData.advanceAmount,
+          balanceAmount: finalBalanceAmount,
+          settlementType: settlementTypeVal,
+          financeName: formData.financeName || "",
+          financeRef: formData.financeRef || "",
+          consultancyFees: Number(formData.consultancyFees) || 0,
+          commission: 0,
+          assignedAgentId: "S-1",
+          agent: "John Staff",
+          status: statusVal,
+          date: formData.date,
+          createdBy: "S-1",
+          aadhaarNumber: formData.aadhaarNumber,
+          panNumber: formData.panNumber,
+          uploads: {
+            photo: uploads.photo,
+            aadhaar: uploads.aadhaar,
+            pan: uploads.pan
+          }
+        };
+
         const res = await fetch("/api/deals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (res.ok) {
-          const savedDeal = await res.json();
-          onUpdateDeals((prev) => [savedDeal, ...prev]);
-          onUpdateVehicles(vehicles.map(
-            (v) => v.id === selectedVehicle.id ? { ...v, status: "Sold" } : v
-          ));
-          generateReceipt(savedDeal);
-        } else {
-          const err = await res.json();
-          alert("Failed to create sale record: " + (err.error || "Unknown error"));
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to create sale record on server.");
         }
-      } catch (err) {
-        console.error("Error creating sale", err);
-        alert("Network error saving sale");
+
+        const savedDeal = await res.json();
+        onUpdateDeals((prev) => [savedDeal, ...prev]);
+        if (onUpdateVehicles) {
+          onUpdateVehicles(vehicles.map((v) => (v.id === selectedVehicle.id ? { ...v, status: "Sold" } : v)));
+        }
+
+        // Close modal and reset form immediately for instant user feedback
+        setShowCreateModal(false);
+        setEditingDeal(null);
+        setSelectedCustomer(null);
+        setSelectedVehicle(null);
+        setUploads({ photo: null, aadhaar: null, pan: null });
+        setFormData({
+          sellingPrice: 0,
+          advanceAmount: 0,
+          expenses: 0,
+          consultancyFees: 0,
+          aadhaarNumber: "",
+          panNumber: "",
+          date: new Date().toISOString().split("T")[0]
+        });
+
+        // Trigger PDF receipt generation and refresh data asynchronously
+        setTimeout(() => {
+          generateReceipt(savedDeal);
+          if (onRefreshData) onRefreshData().catch(console.error);
+        }, 50);
       }
+    } catch (err) {
+      console.error("Error saving sale receipt:", err);
+      alert("Failed to save sale receipt: " + (err.message || "Network error occurred"));
+    } finally {
+      setIsSaving(false);
     }
-    setShowCreateModal(false);
-    setSelectedCustomer(null);
-    setSelectedVehicle(null);
-    setUploads({ photo: null, aadhaar: null, pan: null });
-    setFormData({
-      sellingPrice: 0,
-      advanceAmount: 0,
-      expenses: 0,
-      consultancyFees: 0,
-      aadhaarNumber: "",
-      panNumber: "",
-      date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
-    });
-    setUploads({ photo: null, aadhaar: null, pan: null });
   };
   const generateReceipt = (deal) => {
-    const doc = new jsPDF();
-
-    const drawPDFContent = (logoImgData = null, signatureImgData = null) => {
-      // 1. HEADER SECTION
-      doc.setFont("Helvetica", "bold");
-      if (logoImgData) {
-        try {
-          doc.addImage(logoImgData, "PNG", 20, 10, 18, 18);
-        } catch (e) {
-          console.error("Error adding logo image to PDF", e);
-        }
-      }
-
-      const hasLogo = !!logoImgData;
-      const textStartX = hasLogo ? 43 : 20;
-
-      // Company Name
-      const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
-      doc.setFontSize(16);
-      doc.setTextColor(30, 41, 59);
-      doc.text(compName.toUpperCase(), textStartX, 16);
-
-      // Subtitle / Address info
-      doc.setFontSize(7.5);
-      doc.setFont("Helvetica", "normal");
-      doc.setTextColor(100);
-
-      const subLines = [];
-      if (businessProfile?.address) subLines.push(businessProfile.address);
-      if (businessProfile?.mobileNumber) subLines.push(`Mob: ${businessProfile.mobileNumber}`);
-      if (businessProfile?.email) subLines.push(`Email: ${businessProfile.email}`);
-      if (businessProfile?.website) subLines.push(`Web: ${businessProfile.website}`);
-      if (businessProfile?.gstNumber) subLines.push(`GSTIN: ${businessProfile.gstNumber}`);
-
-      if (subLines.length === 0) {
-        subLines.push("Premium Pre-owned Vehicles & Consultancy Services");
-      }
-
-      const addressLineText = subLines.join(" | ");
-      const splitAddress = doc.splitTextToSize(addressLineText, 185 - textStartX);
-      doc.text(splitAddress, textStartX, 22);
-
-      doc.setDrawColor(226, 232, 240);
-      doc.line(20, 31, 190, 31);
-
-      doc.setFontSize(11);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text("SALES TRANSACTION RECEIPT", 20, 43);
-
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(9.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(`Receipt ID: REC-${deal.id}`, 20, 50);
-      doc.text(`Transaction Date: ${deal.date}`, 190, 50, { align: "right" });
-
-      doc.setFontSize(10.5);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text("Customer Profile", 20, 62);
-      doc.line(20, 65, 95, 65);
-      doc.setFontSize(9);
-      doc.setFont("Helvetica", "normal");
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Name: ${deal.customerName}`, 20, 71);
-
-      doc.setFontSize(10.5);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text("Vehicle Overview", 115, 62);
-      doc.line(115, 65, 190, 65);
-      doc.setFontSize(9);
-      doc.setFont("Helvetica", "normal");
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Vehicle: ${deal.vehicleName}`, 115, 71);
-
-      const tableData = [
-        ["Description Item Specification", "Charged Value (INR)"],
-        ["Selling Valuation Quote", `INR ${deal.sellingPrice.toLocaleString("en-IN")}`],
-        ["Authorized Expenses & RC Charges", `INR ${deal.expenses.toLocaleString("en-IN")}`],
-        ["Transaction Valuation Total", `INR ${deal.totalPrice.toLocaleString("en-IN")}`],
-        ["Advance Booking Paid Amount", `INR ${deal.advanceAmount.toLocaleString("en-IN")}`],
-        ["Remaining Pending Due Amount", `INR ${deal.balanceAmount.toLocaleString("en-IN")}`]
-      ];
-      autoTable(doc, {
-        startY: 82,
-        head: [tableData[0]],
-        body: tableData.slice(1),
-        theme: "striped",
-        headStyles: { fillColor: [37, 99, 235] },
-        columnStyles: {
-          0: { cellWidth: 120 },
-          1: { cellWidth: 50, halign: "right" }
-        }
-      });
-
-      const finalY = doc.lastAutoTable.finalY + 12;
-      doc.setFontSize(11);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(30, 41, 59);
-      doc.text(`Grand Total: INR ${deal.totalPrice.toLocaleString("en-IN")}`, 190, finalY, { align: "right" });
-
-      // Dynamic Terms and Conditions rendering block
-      if (businessProfile?.termsAndConditions) {
-        doc.setFontSize(7.5);
-        doc.setFont("Helvetica", "bold");
-        doc.setTextColor(51, 65, 85);
-        doc.text("TERMS & CONDITIONS", 20, finalY + 10);
-        doc.setFont("Helvetica", "normal");
-        doc.setTextColor(110);
-        const termsLines = doc.splitTextToSize(businessProfile.termsAndConditions, 170);
-        doc.text(termsLines, 20, finalY + 14);
-      }
-
-      // Dynamic authorized signature block
-      const sigY = finalY + 40;
-      doc.setDrawColor(226, 232, 240);
-      if (signatureImgData) {
-        try {
-          doc.addImage(signatureImgData, "PNG", 140, sigY - 14, 32, 11);
-        } catch (e) {
-          console.error("Error adding signature image to PDF", e);
-        }
-      }
-      doc.setFontSize(9);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(30, 41, 59);
-      doc.text(`Authorized Personnel Officer Signature`, 120, sigY);
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(120);
-      doc.text(`Generated via ${businessProfile?.companyName || "Auto360 Consultancy"} Enterprise ERP`, 120, sigY + 4);
-
-      doc.save(`Receipt_Sales_${deal.id}.pdf`);
-    };
-
-    // Async image loaders to fetch and paint dynamic images safely
-    const logoUrl = businessProfile?.companyLogo;
-    const sigUrl = businessProfile?.authorizedSignature;
-
-    const loadImage = (url) => {
-      return new Promise((resolve) => {
-        if (!url) {
-          resolve(null);
-          return;
-        }
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            try {
-              resolve(canvas.toDataURL("image/png"));
-            } catch (err) {
-              resolve(null);
-            }
-          } else {
-            resolve(null);
-          }
-        };
-        img.onerror = () => {
-          resolve(null);
-        };
-        img.src = url;
-      });
-    };
-
-    Promise.all([loadImage(logoUrl), loadImage(sigUrl)]).then(([logoData, sigData]) => {
-      drawPDFContent(logoData, sigData);
-    });
+    generateCustomerReceiptPDF({
+      receiptNo: `REC-${deal.id}`,
+      id: deal.id,
+      date: deal.date,
+      customerName: deal.customerName,
+      customerMobile: deal.customerMobile || deal.mobile,
+      vehicleName: deal.vehicleName,
+      regNo: deal.regNo,
+      sellingPrice: deal.sellingPrice,
+      advanceAmount: deal.advanceAmount,
+      receivedAmount: deal.advanceAmount,
+      balanceAmount: deal.balanceAmount,
+      paymentMode: deal.paymentMode || "Cash",
+      referenceNo: deal.referenceNo || deal.id,
+      remarks: deal.remarks || deal.narration || "Sale Booking Advance"
+    }, businessProfile);
   };
   return <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -530,29 +478,43 @@ export default function Sales({
           <h2 className="text-2xl font-bold text-slate-900">Sales Management</h2>
           <p className="text-sm text-slate-500">Manage vehicle sales and customer receipts</p>
         </div>
-        {hasModulePermission(currentUser, "sales", "create") && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center justify-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-200"
+            onClick={() => {
+              const defaultVeh = vehicles.find((v) => v.status === "Available") || vehicles[0] || {};
+              setPosterVehicle(defaultVeh);
+              setPosterDeal(null);
+              setShowPosterModal(true);
+            }}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 px-4 py-2.5 rounded-xl font-extrabold hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-200 cursor-pointer"
           >
-            <Plus size={20} />
-            Create Sale
+            <Sparkles size={18} />
+            <span>Showroom Advert Poster</span>
           </button>
-        )}
+          {hasModulePermission(currentUser, "sales", "create") && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center justify-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 cursor-pointer"
+            >
+              <Plus size={20} />
+              Create Sale
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Sales</p>
-          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{stats.totalSales.toLocaleString("en-IN")}</h3>
+          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(stats.totalSales) || 0).toLocaleString("en-IN")}</h3>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-emerald-600">Collections</p>
-          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{stats.collections.toLocaleString("en-IN")}</h3>
+          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(stats.collections) || 0).toLocaleString("en-IN")}</h3>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-amber-600">Pending Balance</p>
-          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{stats.pending.toLocaleString("en-IN")}</h3>
+          <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(stats.pending) || 0).toLocaleString("en-IN")}</h3>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-brand-600">Total Deals</p>
@@ -645,39 +607,48 @@ export default function Sales({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDeals.map((deal) => <tr
-    key={deal.id}
-    className="hover:bg-slate-50 transition-colors group cursor-pointer"
-    onClick={() => setSelectedDeal(deal)}
-  >
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-slate-900">{deal.id}</span>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{deal.date}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                        <User size={14} className="text-slate-400" />
-                        {deal.customerName}
+              {filteredDeals.map((deal) => {
+                const dealStats = calculateDealSalesOutstanding(deal, payments, vouchers);
+                const totalSaleValue = dealStats.totalSaleValue;
+                const outstandingBal = dealStats.outstanding;
+
+                return (
+                  <tr
+                    key={deal.id}
+                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    onClick={() => setSelectedDeal(deal)}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-bold text-slate-900">{deal.id}</span>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{deal.date}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                          <User size={14} className="text-slate-400" />
+                          {deal.customerName}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <Car size={14} className="text-slate-400" />
+                          {deal.vehicleName}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <Car size={14} className="text-slate-400" />
-                        {deal.vehicleName}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-slate-900">₹{deal.sellingPrice.toLocaleString("en-IN")}</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Total: ₹{deal.totalPrice.toLocaleString("en-IN")}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-    "text-sm font-bold",
-    deal.balanceAmount > 0 ? "text-rose-600" : "text-emerald-600"
-  )}>
-                      ₹{deal.balanceAmount.toLocaleString("en-IN")}
-                    </span>
-                  </td>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-slate-900">₹{totalSaleValue.toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold">
+                        Selling: ₹{(Number(deal.sellingPrice) || 0).toLocaleString("en-IN")}
+                        {Number(deal.consultancyFees || 0) > 0 && ` + Fee: ₹${Number(deal.consultancyFees).toLocaleString("en-IN")}`}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        outstandingBal > 0 ? "text-rose-600" : "text-emerald-600"
+                      )}>
+                        ₹{outstandingBal.toLocaleString("en-IN")}
+                      </span>
+                    </td>
                   <td className="px-6 py-4">
                     <span className={cn(
     "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -715,6 +686,18 @@ export default function Sales({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          onNavigate && onNavigate("payments", { paymentsSubTab: "customer", partyId: deal.customerId, vehicleId: deal.vehicleId || deal.id });
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-all text-xs font-bold cursor-pointer border border-emerald-200 outline-none"
+                        title="Record Customer Receipt"
+                      >
+                        <CreditCard size={12} className="text-emerald-600" />
+                        <span>Receipt</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           generateReceipt(deal);
                         }}
                         className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-lg transition-all text-xs font-bold cursor-pointer border border-slate-200 outline-none"
@@ -722,6 +705,15 @@ export default function Sales({
                       >
                         <Printer size={12} className="text-slate-500" />
                         <span>Print</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenPoster(deal, e)}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-all text-xs font-bold cursor-pointer border border-indigo-200 outline-none"
+                        title="Sales Poster & Share"
+                      >
+                        <Share2 size={12} className="text-indigo-600" />
+                        <span>Share</span>
                       </button>
                       {hasModulePermission(currentUser, "sales", "delete") && (
                         <button
@@ -736,7 +728,9 @@ export default function Sales({
                       )}
                     </div>
                   </td>
-                </tr>)}
+                </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -746,7 +740,7 @@ export default function Sales({
     /* Sale Details Modal */
   }
       <AnimatePresence>
-        {selectedDeal && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        {selectedDeal && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedDeal(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -777,29 +771,38 @@ export default function Sales({
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                       <div>
                         <p className="text-xs text-slate-500">Purchase Price</p>
-                        <p className="text-sm font-bold text-slate-900">₹{selectedDeal.purchasePrice.toLocaleString("en-IN")}</p>
+                        <p className="text-sm font-bold text-slate-900">₹{(Number(selectedDeal.purchasePrice) || 0).toLocaleString("en-IN")}</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Expenses</p>
-                        <p className="text-sm font-bold text-rose-600">₹{selectedDeal.expenses.toLocaleString("en-IN")}</p>
+                        <p className="text-sm font-bold text-rose-600">₹{(Number(selectedDeal.expenses) || 0).toLocaleString("en-IN")}</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Selling Price</p>
-                        <p className="text-sm font-bold text-emerald-600">₹{selectedDeal.sellingPrice.toLocaleString("en-IN")}</p>
+                        <p className="text-sm font-bold text-emerald-600">₹{(Number(selectedDeal.sellingPrice) || 0).toLocaleString("en-IN")}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Consultancy Fees</p>
+                        <p className="text-sm font-bold text-indigo-600">₹{(Number(selectedDeal.consultancyFees) || 0).toLocaleString("en-IN")}</p>
                       </div>
                       <div className="pt-4 border-t border-slate-200">
-                        <p className="text-xs text-slate-500">Total Price</p>
-                        <p className="text-lg font-bold text-slate-900">₹{selectedDeal.totalPrice.toLocaleString("en-IN")}</p>
+                        <p className="text-xs text-slate-500 font-bold">Total Sale Value</p>
+                        <p className="text-lg font-bold text-slate-900">₹{(Number(selectedDeal.totalPrice) || (Number(selectedDeal.sellingPrice || 0) + Number(selectedDeal.consultancyFees || 0))).toLocaleString("en-IN")}</p>
                       </div>
                       <div className="pt-4 border-t border-slate-200">
-                        <p className="text-xs text-slate-500">Advance Paid</p>
-                        <p className="text-lg font-bold text-brand-600">₹{selectedDeal.advanceAmount.toLocaleString("en-IN")}</p>
+                        <p className="text-xs text-slate-500 font-bold">Advance Received</p>
+                        <p className="text-lg font-bold text-emerald-600">₹{(Number(selectedDeal.advanceAmount) || 0).toLocaleString("en-IN")}</p>
                       </div>
                       <div className="pt-4 border-t border-slate-200">
-                        <p className="text-xs text-slate-500">Balance Amount</p>
-                        <p className={cn("text-lg font-bold", selectedDeal.balanceAmount > 0 ? "text-rose-600" : "text-emerald-600")}>
-                          ₹{selectedDeal.balanceAmount.toLocaleString("en-IN")}
-                        </p>
+                        <p className="text-xs text-slate-500 font-bold">Outstanding Balance</p>
+                        {(() => {
+                          const dealRes = calculateDealSalesOutstanding(selectedDeal, payments, vouchers);
+                          return (
+                            <p className={cn("text-lg font-bold", dealRes.outstanding > 0 ? "text-rose-600" : "text-emerald-600")}>
+                              ₹{dealRes.outstanding.toLocaleString("en-IN")}
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -807,11 +810,18 @@ export default function Sales({
 
                 <div className="space-y-4">
                   <button
-    onClick={() => generateReceipt(selectedDeal)}
-    className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-100"
-  >
+                    onClick={() => generateReceipt(selectedDeal)}
+                    className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-100"
+                  >
                     <Printer size={18} />
                     Print Receipt
+                  </button>
+                  <button
+                    onClick={() => handleOpenPoster(selectedDeal)}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 cursor-pointer"
+                  >
+                    <Share2 size={18} />
+                    Sales Poster & Share
                   </button>
                   <button
                     onClick={() => setShowDocsModal(true)}
@@ -1005,7 +1015,7 @@ export default function Sales({
     /* Create Sale Modal */
   }
       <AnimatePresence>
-        {showCreateModal && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        {showCreateModal && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCreateModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
               <div className="flex items-center justify-between mb-6">
@@ -1024,7 +1034,7 @@ export default function Sales({
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs font-bold text-brand-700">Customer ID: {selectedCustomer.id}</p>
-                            <p className="text-sm font-bold text-slate-800">{selectedCustomer.name}</p>
+                            <p className="text-sm font-bold text-slate-800">{selectedCustomer.name} <span className="text-xs font-bold text-brand-600">({selectedCustomer.role || "Buyer"})</span></p>
                             <p className="text-xs text-slate-600">Mobile: {selectedCustomer.mobile}</p>
                           </div>
                           <button onClick={() => setSelectedCustomer(null)} className="p-1 text-slate-400 hover:text-red-500 transition-colors"><X size={16} /></button>
@@ -1062,7 +1072,9 @@ export default function Sales({
                     {selectedVehicle ? <div className="flex items-center justify-between p-3 bg-brand-50 border border-brand-200 rounded-xl">
                         <div>
                           <p className="text-sm font-bold text-brand-900">{selectedVehicle.name}</p>
-                          <p className="text-[10px] text-brand-600">Purchase: ₹{selectedVehicle.purchasePrice.toLocaleString("en-IN")}</p>
+                          <p className="text-[10px] text-brand-600">
+                            Purchase: ₹{(Number(selectedVehicle.purchasePrice || selectedVehicle.purchase_price) || 0).toLocaleString("en-IN")} • Preset Sales Price: ₹{(Number(selectedVehicle.salesPrice || selectedVehicle.sales_price || selectedVehicle.expectedSellingPrice || selectedVehicle.expected_selling_price || selectedVehicle.offerPrice || selectedVehicle.offer_price || (Number(selectedVehicle.sellingPrice) > 0 ? selectedVehicle.sellingPrice : 0) || (Number(selectedVehicle.selling_price) > 0 ? selectedVehicle.selling_price : 0)) || 0).toLocaleString("en-IN")}
+                          </p>
                         </div>
                         <button onClick={() => setSelectedVehicle(null)} className="p-1 text-brand-400 hover:text-brand-600"><X size={14} /></button>
                       </div> : <>
@@ -1074,9 +1086,27 @@ export default function Sales({
                             {filteredVehicles.map((v) => <button key={v.id} onClick={() => {
     setSelectedVehicle(v);
     setVehicleSearch("");
+    const offerVal = Number(
+      v.salesPrice ||
+      v.sales_price ||
+      v.expectedSellingPrice ||
+      v.expected_selling_price ||
+      v.offerPrice ||
+      v.offer_price ||
+      (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) ||
+      (Number(v.selling_price) > 0 ? v.selling_price : 0)
+    ) || 0;
+    setFormData((prev) => ({
+      ...prev,
+      sellingPrice: offerVal,
+      expenses: Number(v.totalExpenses || v.expenses) || 0,
+      consultancyFees: Number(v.consultancyFees || v.consultancy_fees) || 0
+    }));
   }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm border-b border-slate-100 last:border-0">
                                 <p className="font-bold text-slate-900">{v.name}</p>
-                                <p className="text-xs text-slate-500">{v.brand} • {v.year}</p>
+                                <p className="text-xs text-slate-500">
+                                  {v.brand} • {v.year} • Sales Price: ₹{(Number(v.salesPrice || v.sales_price || v.expectedSellingPrice || v.expected_selling_price || v.offerPrice || v.offer_price || (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) || (Number(v.selling_price) > 0 ? v.selling_price : 0)) || 0).toLocaleString("en-IN")}
+                                </p>
                               </button>)}
                           </div>}
                       </>}
@@ -1106,8 +1136,75 @@ export default function Sales({
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Total Selling Price (₹) <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-black ml-1">Auto Read-only</span></label>
-                    <input type="text" readOnly value={`\u20B9 ${totalPrice.toLocaleString("en-IN")}`} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-850 cursor-not-allowed outline-none focus:ring-0" />
+                    <input type="text" readOnly value={`\u20B9 ${(Number(totalPrice) || 0).toLocaleString("en-IN")}`} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-850 cursor-not-allowed outline-none focus:ring-0" />
                   </div>
+                </div>
+
+                {/* LIVE SALES PROFITABILITY CALCULATION CARD */}
+                <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Live Profitability Analysis</span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Margin: {profitMarginPercent}%</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <p className="text-slate-400 text-[10px]">Purchase Cost</p>
+                      <p className="font-bold text-slate-200">₹{purchasePrice.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px]">Total Expenses & Cost</p>
+                      <p className="font-bold text-slate-200">₹{totalVehicleCost.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px]">Gross Profit</p>
+                      <p className={cn("font-extrabold", grossProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>₹{grossProfit.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px]">Net Profit</p>
+                      <p className={cn("font-extrabold", netProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>₹{netProfit.toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-4 text-left">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-800">Settlement Type</label>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">Payment Routing</span>
+                  </div>
+                  <select
+                    value={formData.settlementType || (balanceAmount === 0 ? "Fully Paid" : "Customer Balance Pending")}
+                    onChange={(e) => setFormData({ ...formData, settlementType: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="Customer Balance Pending">Customer Balance Pending (Customer owes balance)</option>
+                    <option value="Settled by Finance">Settled by Finance (Loan/Finance Company payout)</option>
+                    <option value="Fully Paid">Fully Paid (No balance remaining)</option>
+                  </select>
+
+                  {formData.settlementType === "Settled by Finance" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Finance Institution / Bank</label>
+                        <input
+                          type="text"
+                          value={formData.financeName || ""}
+                          onChange={(e) => setFormData({ ...formData, financeName: e.target.value })}
+                          placeholder="e.g. HDFC Bank / Sundaram Finance"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Finance Approval / Ref No.</label>
+                        <input
+                          type="text"
+                          value={formData.financeRef || ""}
+                          onChange={(e) => setFormData({ ...formData, financeRef: e.target.value })}
+                          placeholder="e.g. FIN-APP-98231"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-6 space-y-6 pt-4 border-t border-slate-100">
@@ -1156,21 +1253,40 @@ export default function Sales({
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Total Price:</span>
-                    <span className="font-bold text-slate-900">₹{totalPrice.toLocaleString("en-IN")}</span>
+                    <span className="font-bold text-slate-900">₹{(Number(totalPrice) || 0).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Balance Due:</span>
-                    <span className="font-bold text-rose-600">₹{balanceAmount.toLocaleString("en-IN")}</span>
+                    <span className="font-bold text-rose-600">₹{(Number(balanceAmount) || 0).toLocaleString("en-IN")}</span>
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button onClick={() => setShowCreateModal(false)} className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
                   <button
-    onClick={handleSaveSale}
-    className="px-6 py-2.5 text-sm font-bold bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-lg shadow-brand-200"
-  >
-                    Save & Print Receipt
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    disabled={isSaving}
+                    className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveSale}
+                    disabled={isSaving || !selectedCustomer || !selectedVehicle}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-lg shadow-brand-200 transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Saving & Printing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Printer size={16} />
+                        <span>Save & Print Receipt</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1217,5 +1333,18 @@ export default function Sales({
             </motion.div>
           </div>}
       </AnimatePresence>
+
+      {/* SALES POSTER MODAL */}
+      <SalesPosterModal
+        vehicle={posterVehicle}
+        deal={posterDeal}
+        businessProfile={businessProfile}
+        isOpen={showPosterModal}
+        onClose={() => {
+          setShowPosterModal(false);
+          setPosterVehicle(null);
+          setPosterDeal(null);
+        }}
+      />
     </div>;
 }

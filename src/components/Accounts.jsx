@@ -13,7 +13,8 @@ export default function Accounts({
   initialTab,
   initialVoucherData,
   currentUser,
-  vehicles = []
+  vehicles = [],
+  onRefreshData
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || "ledger");
   const [selectedStatementLedger, setSelectedStatementLedger] = useState(null);
@@ -136,7 +137,7 @@ export default function Accounts({
       const netProfit = totalIncomes - totalExpenses;
 
       const activeVehicles = Array.isArray(vehicles) ? vehicles : [];
-      const closingStock = activeVehicles.filter(v => v.status === "Available" && !v.isDeleted).reduce((acc, v) => acc + (v.purchasePrice || v.purchase_price || 0), 0) || 0;
+      const closingStock = activeVehicles.filter(v => v.status !== "Sold" && v.vehicle_status !== "Sold" && !v.isSold && !v.isDeleted).reduce((acc, v) => acc + (Number(v.purchasePrice) || Number(v.purchase_price) || Number(v.net_cost) || Number(v.amount) || 0), 0) || 0;
       const sundryDebtors = activeVehicles.filter(v => v.status === "Sold" && !v.isDeleted).reduce((acc, v) => acc + (Number(v.balance_amount) || 0), 0) || 0;
 
       const cashBalance = dynamicLedgers.find(l => l.name === "Cash in Hand")?.dr || 0;
@@ -244,7 +245,7 @@ export default function Accounts({
         const netProfit = totalIncomes - totalExpenses;
 
         const activeVehicles = Array.isArray(vehicles) ? vehicles : [];
-        const closingStock = activeVehicles.filter(v => v.status === "Available" && !v.isDeleted).reduce((acc, v) => acc + (v.purchasePrice || v.purchase_price || 0), 0) || 0;
+        const closingStock = activeVehicles.filter(v => v.status !== "Sold" && v.vehicle_status !== "Sold" && !v.isSold && !v.isDeleted).reduce((acc, v) => acc + (Number(v.purchasePrice) || Number(v.purchase_price) || Number(v.net_cost) || Number(v.amount) || 0), 0) || 0;
         const sundryDebtors = activeVehicles.filter(v => v.status === "Sold" && !v.isDeleted).reduce((acc, v) => acc + (Number(v.balance_amount) || 0), 0) || 0;
 
         const cashBalance = dynamicLedgers.find(l => l.name === "Cash in Hand")?.dr || 0;
@@ -360,7 +361,8 @@ export default function Accounts({
           },
           body: JSON.stringify({
             category: voucher.expenseCategory || "Other",
-            amount: voucher.amount
+            amount: voucher.amount,
+            skipVoucher: true
           })
         }).then((res2) => {
           if (!res2.ok) {
@@ -372,6 +374,7 @@ export default function Accounts({
       }
       setShowAddVoucher(false);
       setActiveTab("daybook");
+      if (onRefreshData) onRefreshData();
       alert("Voucher posted successfully!");
     })
     .catch(err => {
@@ -406,6 +409,7 @@ export default function Accounts({
     .then(savedVoucher => {
       onUpdateEntries((prev) => prev.map(v => v.id === id ? savedVoucher : v));
       setEditingVoucher(null);
+      if (onRefreshData) onRefreshData();
       alert("Voucher updated successfully!");
     })
     .catch(err => {
@@ -422,6 +426,7 @@ export default function Accounts({
     .then(res => {
       if (!res.ok) throw new Error("Failed to delete voucher");
       onUpdateEntries((prev) => prev.filter(v => v.id !== id));
+      if (onRefreshData) onRefreshData();
       alert("Voucher deleted successfully!");
     })
     .catch(err => {
@@ -431,6 +436,8 @@ export default function Accounts({
 
   const tabs = [
     { id: "ledger", label: "Ledger Master", icon: Book },
+    { id: "cashbook", label: "Cash Book", icon: Book },
+    { id: "bankbook", label: "Bank Book", icon: Wallet },
     { id: "voucher", label: "Voucher Entry", icon: Plus },
     { id: "daybook", label: "Day Book", icon: Calendar },
     { id: "trial", label: "Trial Balance", icon: BarChart3 },
@@ -595,9 +602,11 @@ export default function Accounts({
             <LedgerMaster
               ledgers={filteredLedgers}
               onAdd={() => setShowAddLedger(true)}
+              onUpdate={(updatedL) => onUpdateLedgers((prev) => prev.map(l => l.id === updatedL.id ? updatedL : l))}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               canCreate={hasModulePermission(currentUser, "accounts", "create")}
+              canEdit={hasModulePermission(currentUser, "accounts", "edit")}
               onViewStatement={(l) => setSelectedStatementLedger(l)}
             />
           )
@@ -612,6 +621,26 @@ export default function Accounts({
             canDelete={hasModulePermission(currentUser, "accounts", "delete")}
           />
         )}
+        {activeTab === "cashbook" && (
+          <CashBankBook
+            bookType="cash"
+            ledgers={ledgers}
+            entries={entries}
+            fromDate={fromDate}
+            toDate={toDate}
+            searchQuery={searchQuery}
+          />
+        )}
+        {activeTab === "bankbook" && (
+          <CashBankBook
+            bookType="bank"
+            ledgers={ledgers}
+            entries={entries}
+            fromDate={fromDate}
+            toDate={toDate}
+            searchQuery={searchQuery}
+          />
+        )}
         {activeTab === "trial" && <TrialBalance ledgers={ledgers} entries={entries} />}
         {activeTab === "pl" && <ProfitLoss ledgers={ledgers} entries={entries} />}
         {activeTab === "balance" && <BalanceSheet ledgers={ledgers} entries={entries} vehicles={vehicles} />}
@@ -621,7 +650,7 @@ export default function Accounts({
     /* Add Ledger Modal */
   }
       <AnimatePresence>
-        {showAddLedger && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        {showAddLedger && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddLedger(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
               <h3 className="text-xl font-bold text-slate-900 mb-6">Create New Ledger</h3>
@@ -674,7 +703,7 @@ export default function Accounts({
 
       <AnimatePresence>
         {editingVoucher && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingVoucher(null)} className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh]">
               <div className="pb-4 border-b border-slate-100 flex justify-between items-center">
@@ -695,19 +724,65 @@ export default function Accounts({
       </AnimatePresence>
     </div>;
 }
-function LedgerMaster({ ledgers, onAdd, searchQuery, setSearchQuery, onViewStatement, canCreate = true }) {
+function LedgerMaster({ ledgers, onAdd, onUpdate, searchQuery, setSearchQuery, onViewStatement, canCreate = true, canEdit = true }) {
+  const [editingLedger, setEditingLedger] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", group: "Indirect Expenses", balance: 0, type: "Debit", status: "Active", remarks: "" });
+  const [editError, setEditError] = useState("");
+
+  const systemLedgerNames = ["Cash in Hand", "Bank Accounts", "Purchase Accounts", "Sales Account", "Capital Account", "Sundry Debtors", "Sundry Creditors", "Loans (Liability)"];
+
+  const handleStartEdit = (ledger) => {
+    const isSys = systemLedgerNames.some(s => s.toLowerCase() === ledger.name.toLowerCase());
+    if (isSys) {
+      alert("System ledgers cannot be edited.");
+      return;
+    }
+    setEditingLedger(ledger);
+    setEditForm({
+      name: ledger.name || "",
+      group: ledger.group || "Indirect Expenses",
+      balance: ledger.balance || 0,
+      type: ledger.type === "Cr" || ledger.type === "Credit" ? "Credit" : "Debit",
+      status: ledger.status || "Active",
+      remarks: ledger.remarks || ""
+    });
+    setEditError("");
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingLedger) return;
+    try {
+      const res = await fetch(`/api/ledgers/${editingLedger.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error || "Failed to update ledger");
+        return;
+      }
+      if (onUpdate) onUpdate(data);
+      setEditingLedger(null);
+      alert("Ledger updated successfully!");
+    } catch (err) {
+      setEditError(err.message);
+    }
+  };
+
   return <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h3 className="text-lg font-bold text-slate-900">Ledger Accounts</h3>
         <div className="flex flex-1 max-w-md relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
-    type="text"
-    placeholder="Search ledgers..."
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
-    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-  />
+            type="text"
+            placeholder="Search ledgers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+          />
         </div>
         {canCreate && (
           <button
@@ -729,21 +804,130 @@ function LedgerMaster({ ledgers, onAdd, searchQuery, setSearchQuery, onViewState
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {ledgers.map((l) => <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                <td className="py-4 font-bold text-slate-900">{l.name}</td>
-                <td className="py-4 text-sm text-slate-500">{l.group}</td>
-                <td className="py-4 text-right">
-                  <span className={cn("font-bold", l.type === "Dr" ? "text-emerald-600" : "text-rose-600")}>
-                    ₹{l.balance.toLocaleString("en-IN")} {l.type}
-                  </span>
-                </td>
-                <td className="py-4 text-right">
-                  <button onClick={() => onViewStatement && onViewStatement(l)} className="text-brand-600 font-bold text-xs hover:underline">View Statement</button>
-                </td>
-              </tr>)}
+            {ledgers.map((l) => {
+              const isSys = systemLedgerNames.some(s => s.toLowerCase() === l.name.toLowerCase());
+              return (
+                <tr key={l.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-4 font-bold text-slate-900 flex items-center gap-2">
+                    {l.name}
+                    {isSys && <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-slate-100 text-slate-500 rounded-md">System</span>}
+                  </td>
+                  <td className="py-4 text-sm text-slate-500">{l.group}</td>
+                  <td className="py-4 text-right">
+                    <span className={cn("font-bold", l.type === "Dr" || l.type === "Debit" ? "text-emerald-600" : "text-rose-600")}>
+                      ₹{(Number(l.balance) || 0).toLocaleString("en-IN")} {l.type}
+                    </span>
+                  </td>
+                  <td className="py-4 text-right space-x-3">
+                    {canEdit && !isSys && (
+                      <button onClick={() => handleStartEdit(l)} className="text-amber-600 font-bold text-xs hover:underline cursor-pointer">Edit</button>
+                    )}
+                    <button onClick={() => onViewStatement && onViewStatement(l)} className="text-brand-600 font-bold text-xs hover:underline cursor-pointer">View Statement</button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* Edit Ledger Modal */}
+      {editingLedger && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl text-left">
+            <h4 className="text-lg font-bold text-slate-900">Edit Ledger Master</h4>
+            {editError && <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-bold">{editError}</div>}
+            <form onSubmit={handleSaveEdit} className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Ledger Name</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs outline-none font-bold"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Group</label>
+                <select
+                  value={editForm.group}
+                  onChange={(e) => setEditForm({ ...editForm, group: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs outline-none"
+                >
+                  <option value="Direct Expenses">Direct Expenses</option>
+                  <option value="Indirect Expenses">Indirect Expenses</option>
+                  <option value="Capital Account">Capital Account</option>
+                  <option value="Sales Accounts">Sales Accounts</option>
+                  <option value="Current Assets">Current Assets</option>
+                  <option value="Current Liabilities">Current Liabilities</option>
+                  <option value="Loans (Liability)">Loans (Liability)</option>
+                  <option value="Bank Accounts">Bank Accounts</option>
+                  <option value="Cash-in-hand">Cash-in-hand</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Opening Balance (INR)</label>
+                  <input
+                    type="number"
+                    value={editForm.balance}
+                    onChange={(e) => setEditForm({ ...editForm, balance: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs outline-none font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Opening Type</label>
+                  <select
+                    value={editForm.type}
+                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs outline-none font-bold"
+                  >
+                    <option value="Debit">Debit (Dr)</option>
+                    <option value="Credit">Credit (Cr)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs outline-none font-bold"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Remarks</label>
+                <input
+                  type="text"
+                  value={editForm.remarks}
+                  onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs outline-none"
+                  placeholder="Optional remarks"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingLedger(null)}
+                  className="px-4 py-2 border text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 shadow-md cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>;
 }
 function VoucherEntry({ onPost, ledgers, initialData, canCreate = true }) {
@@ -1188,6 +1372,281 @@ function DayBook({ entries = [], onEdit, onDelete, canEdit = true, canDelete = t
       </div>
     </div>;
 }
+function CashBankBook({ bookType = "cash", ledgers = [], entries = [], fromDate, toDate, searchQuery = "" }) {
+  const isCash = bookType === "cash";
+  const bookName = isCash ? "Cash Book" : "Bank Book";
+  const targetLedgerName = isCash ? "Cash in Hand" : "Bank Accounts";
+
+  const [branchFilter, setBranchFilter] = useState("All");
+  const [ledgerFilter, setLedgerFilter] = useState("All");
+
+  const openingBalance = useMemo(() => {
+    const l = ledgers.find((item) => item.name === targetLedgerName);
+    return Number(l?.balance) || 0;
+  }, [ledgers, targetLedgerName]);
+
+  const bookEntries = useMemo(() => {
+    let running = openingBalance;
+    const sorted = [...entries]
+      .filter((e) => {
+        if (e.isDeleted) return false;
+        const eDate = e.date ? e.date.split("T")[0] : "";
+        if (fromDate && eDate < fromDate) return false;
+        if (toDate && eDate > toDate) return false;
+
+        const mode = (e.mode || "").toLowerCase();
+        const drAcc = e.debitAccount || "";
+        const crAcc = e.creditAccount || "";
+
+        let isMatch = false;
+        if (isCash) {
+          isMatch = mode === "cash" || drAcc === "Cash in Hand" || crAcc === "Cash in Hand";
+        } else {
+          isMatch = (mode !== "cash" && mode !== "") || drAcc === "Bank Accounts" || crAcc === "Bank Accounts";
+        }
+
+        if (!isMatch) return false;
+
+        if (branchFilter !== "All" && e.branch && e.branch !== branchFilter) {
+          return false;
+        }
+
+        if (ledgerFilter !== "All") {
+          if (drAcc !== ledgerFilter && crAcc !== ledgerFilter && e.ledger !== ledgerFilter) {
+            return false;
+          }
+        }
+
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchQ =
+            (e.narration || "").toLowerCase().includes(q) ||
+            (e.ledger || "").toLowerCase().includes(q) ||
+            (e.debitAccount || "").toLowerCase().includes(q) ||
+            (e.creditAccount || "").toLowerCase().includes(q) ||
+            (e.id || "").toLowerCase().includes(q);
+          if (!matchQ) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let totalDr = 0;
+    let totalCr = 0;
+
+    const list = sorted.map((item) => {
+      const amt = Number(item.amount) || 0;
+      let drAmt = 0;
+      let crAmt = 0;
+
+      if (
+        item.debitAccount === targetLedgerName ||
+        (item.type === "Receipt" && (isCash ? item.mode === "Cash" : item.mode !== "Cash"))
+      ) {
+        drAmt = amt;
+        totalDr += amt;
+        running += amt;
+      } else {
+        crAmt = amt;
+        totalCr += amt;
+        running -= amt;
+      }
+
+      return {
+        ...item,
+        drAmt,
+        crAmt,
+        runningBalance: running
+      };
+    });
+
+    return { list, totalDr, totalCr, closingBalance: running };
+  }, [entries, isCash, targetLedgerName, openingBalance, fromDate, toDate, searchQuery, branchFilter, ledgerFilter]);
+
+  const handleExportCSV = () => {
+    const headers = ["Date", "Voucher No", "Type", "Particulars", "Branch", "Narration", "Receipt (Dr)", "Payment (Cr)", "Running Balance"];
+    const rows = bookEntries.list.map(item => [
+      item.date,
+      item.id,
+      item.type,
+      item.debitAccount === targetLedgerName ? item.creditAccount : item.debitAccount,
+      item.branch || "Coimbatore",
+      `"${(item.narration || "").replace(/"/g, '""')}"`,
+      item.drAmt || 0,
+      item.crAmt || 0,
+      item.runningBalance || 0
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${bookName.replace(/\s+/g, '_')}_Statement.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`${bookName} Register Statement`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Target Account: ${targetLedgerName} | Date: ${fromDate || 'All'} to ${toDate || 'All'}`, 14, 22);
+      doc.text(`Opening: ₹${openingBalance.toLocaleString("en-IN")} | Receipts: ₹${bookEntries.totalDr.toLocaleString("en-IN")} | Payments: ₹${bookEntries.totalCr.toLocaleString("en-IN")} | Closing: ₹${bookEntries.closingBalance.toLocaleString("en-IN")}`, 14, 28);
+
+      const tableHeaders = ["Date", "Voucher No", "Type", "Particulars", "Branch", "Receipt (Dr)", "Payment (Cr)", "Balance"];
+      const tableRows = bookEntries.list.map(item => [
+        item.date,
+        item.id,
+        item.type,
+        item.debitAccount === targetLedgerName ? item.creditAccount : item.debitAccount,
+        item.branch || "Coimbatore",
+        item.drAmt > 0 ? `₹${item.drAmt.toLocaleString("en-IN")}` : "-",
+        item.crAmt > 0 ? `₹${item.crAmt.toLocaleString("en-IN")}` : "-",
+        `₹${item.runningBalance.toLocaleString("en-IN")}`
+      ]);
+
+      autoTable(doc, {
+        startY: 34,
+        head: [tableHeaders],
+        body: tableRows,
+        theme: "striped",
+        headStyles: { fillColor: isCash ? [16, 185, 129] : [79, 70, 229] }
+      });
+
+      doc.save(`${bookName.replace(/\s+/g, '_')}_Statement.pdf`);
+    } catch (err) {
+      console.error(err);
+      window.print();
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6 text-left">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">{bookName} Ledger Register</h3>
+          <p className="text-xs text-slate-500 font-medium">Automatic independent cash & bank register for {targetLedgerName}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs transition-all border border-emerald-100 cursor-pointer"
+          >
+            <Download size={14} />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs transition-all border border-indigo-100 cursor-pointer"
+          >
+            <Download size={14} />
+            <span>Export PDF</span>
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold text-xs transition-all border border-amber-100 cursor-pointer"
+          >
+            <Printer size={14} />
+            <span>Print</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-bold text-slate-600">Branch:</label>
+          <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none">
+            <option value="All">All Branches</option>
+            <option value="Coimbatore">Coimbatore</option>
+            <option value="Chennai">Chennai</option>
+            <option value="Madurai">Madurai</option>
+            <option value="Salem">Salem</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-bold text-slate-600">Ledger Filter:</label>
+          <select value={ledgerFilter} onChange={(e) => setLedgerFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none max-w-xs truncate">
+            <option value="All">All Ledgers</option>
+            {ledgers.map((l) => (
+              <option key={l.id || l.name} value={l.name}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <span className="text-[10px] font-bold text-slate-500 uppercase">Opening Balance</span>
+          <h4 className="text-lg font-black text-slate-900 font-mono">₹{openingBalance.toLocaleString("en-IN")}</h4>
+        </div>
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+          <span className="text-[10px] font-bold text-emerald-700 uppercase">Total Receipts (Dr)</span>
+          <h4 className="text-lg font-black text-emerald-800 font-mono">₹{bookEntries.totalDr.toLocaleString("en-IN")}</h4>
+        </div>
+        <div className="bg-rose-50 p-4 rounded-xl border border-rose-200">
+          <span className="text-[10px] font-bold text-rose-700 uppercase">Total Payments (Cr)</span>
+          <h4 className="text-lg font-black text-rose-800 font-mono">₹{bookEntries.totalCr.toLocaleString("en-IN")}</h4>
+        </div>
+        <div className="bg-brand-50 p-4 rounded-xl border border-brand-200">
+          <span className="text-[10px] font-bold text-brand-700 uppercase">Closing Balance</span>
+          <h4 className="text-lg font-black text-brand-900 font-mono">₹{bookEntries.closingBalance.toLocaleString("en-IN")}</h4>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
+            <tr>
+              <th className="py-3 px-4">Date</th>
+              <th className="py-3 px-4">Voucher No</th>
+              <th className="py-3 px-4">Type</th>
+              <th className="py-3 px-4">Particulars</th>
+              <th className="py-3 px-4">Branch</th>
+              <th className="py-3 px-4">Narration</th>
+              <th className="py-3 px-4 text-right">Receipt (Dr)</th>
+              <th className="py-3 px-4 text-right">Payment (Cr)</th>
+              <th className="py-3 px-4 text-right">Running Balance</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 font-medium">
+            {bookEntries.list.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-8 text-center text-slate-400">
+                  No {bookName} transactions recorded in selected filters
+                </td>
+              </tr>
+            ) : (
+              bookEntries.list.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono text-slate-600">{item.date}</td>
+                  <td className="py-3 px-4 font-mono font-bold text-indigo-600">{item.id}</td>
+                  <td className="py-3 px-4 uppercase font-bold text-slate-700">{item.type}</td>
+                  <td className="py-3 px-4 font-bold text-slate-900">{item.debitAccount === targetLedgerName ? item.creditAccount : item.debitAccount}</td>
+                  <td className="py-3 px-4 text-slate-600 font-medium">{item.branch || "Coimbatore"}</td>
+                  <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{item.narration}</td>
+                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
+                    {item.drAmt > 0 ? `₹${item.drAmt.toLocaleString("en-IN")}` : "-"}
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono font-bold text-rose-600">
+                    {item.crAmt > 0 ? `₹${item.crAmt.toLocaleString("en-IN")}` : "-"}
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono font-black text-slate-900">
+                    ₹{item.runningBalance.toLocaleString("en-IN")}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 function computeDynamicLedgers(ledgersList = [], entriesList = []) {
   const ledgerMap = {};
   
@@ -1256,9 +1715,15 @@ function computeDynamicLedgers(ledgersList = [], entriesList = []) {
     // Process Debit Posting
     if (drAcc) {
       if (!ledgerMap[drAcc]) {
-        let defaultGroup = "Indirect Expenses";
-        if (drAcc.includes("Customer") || drAcc.includes("Debtors")) defaultGroup = "Current Assets";
-        else if (drAcc.includes("Vendor") || drAcc.includes("Creditors") || drAcc.includes("Supplier")) defaultGroup = "Current Liabilities";
+        let defaultGroup = "Current Assets";
+        const lower = drAcc.toLowerCase();
+        if (lower.includes("expense") || lower.includes("rent") || lower.includes("salary") || lower.includes("maintenance") || lower.includes("refurbishment") || lower.includes("fuel") || lower.includes("rto") || lower.includes("insurance")) {
+          defaultGroup = "Indirect Expenses";
+        } else if (lower.includes("supplier") || lower.includes("vendor") || lower.includes("creditor") || lower.includes("payable")) {
+          defaultGroup = "Current Liabilities";
+        } else if (lower.includes("customer") || lower.includes("debtor") || lower.includes("receivable") || lower.includes("sales")) {
+          defaultGroup = "Current Assets";
+        }
         
         ledgerMap[drAcc] = { name: drAcc, group: defaultGroup, balance: 0, type: "Debit", debits: 0, credits: 0 };
       }
@@ -1269,8 +1734,14 @@ function computeDynamicLedgers(ledgersList = [], entriesList = []) {
     if (crAcc) {
       if (!ledgerMap[crAcc]) {
         let defaultGroup = "Sales Accounts";
-        if (crAcc.includes("Customer") || crAcc.includes("Debtors")) defaultGroup = "Current Assets";
-        else if (crAcc.includes("Vendor") || crAcc.includes("Creditors") || crAcc.includes("Supplier")) defaultGroup = "Current Liabilities";
+        const lower = crAcc.toLowerCase();
+        if (lower.includes("supplier") || lower.includes("vendor") || lower.includes("creditor") || lower.includes("payable")) {
+          defaultGroup = "Current Liabilities";
+        } else if (lower.includes("customer") || lower.includes("debtor") || lower.includes("receivable")) {
+          defaultGroup = "Current Assets";
+        } else if (lower.includes("expense") || lower.includes("rent") || lower.includes("salary") || lower.includes("maintenance")) {
+          defaultGroup = "Indirect Expenses";
+        }
         
         ledgerMap[crAcc] = { name: crAcc, group: defaultGroup, balance: 0, type: "Credit", debits: 0, credits: 0 };
       }
@@ -1426,7 +1897,7 @@ function BalanceSheet({ ledgers = [], entries = [], vehicles = [] }) {
   const netProfit = totalIncomes - totalExpenses;
 
   const activeVehicles = Array.isArray(vehicles) ? vehicles : [];
-  const closingStock = activeVehicles.filter(v => v.status === "Available" && !v.isDeleted).reduce((acc, v) => acc + (v.purchasePrice || v.purchase_price || 0), 0) || 0;
+  const closingStock = activeVehicles.filter(v => v.status !== "Sold" && v.vehicle_status !== "Sold" && !v.isSold && !v.isDeleted).reduce((acc, v) => acc + (Number(v.purchasePrice) || Number(v.purchase_price) || Number(v.net_cost) || Number(v.amount) || 0), 0) || 0;
   const sundryDebtors = activeVehicles.filter(v => v.status === "Sold" && !v.isDeleted).reduce((acc, v) => acc + (Number(v.balance_amount) || 0), 0) || 0;
 
   const cashBalance = dynamicLedgers.find(l => l.name === "Cash in Hand")?.dr || 0;

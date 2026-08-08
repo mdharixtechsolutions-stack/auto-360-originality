@@ -394,6 +394,62 @@ function initDb() {
         }
       });
 
+      // Standardize Purchase records and loan statuses across entire database
+      if (data.purchases && Array.isArray(data.purchases)) {
+        data.purchases.forEach((p) => {
+          const sp = Number(p.expected_selling_price || p.sales_price || p.selling_price || p.offerPrice || p.offer_price || p.purchase_price) || 0;
+          if (p.expected_selling_price !== sp || p.selling_price !== sp || p.offerPrice !== sp || p.sales_price !== sp) {
+            p.expected_selling_price = sp;
+            p.selling_price = sp;
+            p.offerPrice = sp;
+            p.sales_price = sp;
+            modified = true;
+          }
+          const purPrice = Number(p.purchase_price || p.purchasePrice) || 0;
+          const advPrice = Number(
+            p.advance_price !== undefined && p.advance_price !== null && p.advance_price !== ""
+              ? p.advance_price
+              : (p.advancePaid !== undefined && p.advancePaid !== null && p.advancePaid !== ""
+                  ? p.advancePaid
+                  : (p.advance_amount !== undefined && p.advance_amount !== null && p.advance_amount !== ""
+                      ? p.advance_amount
+                      : (p.advanceAmount !== undefined && p.advanceAmount !== null && p.advanceAmount !== ""
+                          ? p.advanceAmount
+                          : 0)))
+          ) || 0;
+          const bal = Math.max(0, purPrice - advPrice);
+          if (p.advance_price !== advPrice || p.advancePaid !== advPrice || p.advance_amount !== advPrice || p.advanceAmount !== advPrice || p.paidAmount !== advPrice) {
+            p.advance_price = advPrice;
+            p.advancePaid = advPrice;
+            p.advance_amount = advPrice;
+            p.advanceAmount = advPrice;
+            p.paidAmount = advPrice;
+            modified = true;
+          }
+          if (p.balance_amount !== bal || p.balanceAmount !== bal) {
+            p.balance_amount = bal;
+            p.balanceAmount = bal;
+            modified = true;
+          }
+        });
+      }
+
+      // Sync auto-created purchase vouchers to match advance price
+      if (data.vouchers && Array.isArray(data.vouchers)) {
+        data.vouchers.forEach((v) => {
+          if (v.narration && v.narration.toLowerCase().includes("auto-created purchase")) {
+            const matchP = (data.purchases || []).find((p) => p.purchase_id === v.vehicleId || p.id === v.vehicleId);
+            if (matchP) {
+              const adv = Number(matchP.advance_price !== undefined ? matchP.advance_price : matchP.advancePaid) || 0;
+              if (v.amount !== adv) {
+                v.amount = adv;
+                modified = true;
+              }
+            }
+          }
+        });
+      }
+
       if (modified) {
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
       }

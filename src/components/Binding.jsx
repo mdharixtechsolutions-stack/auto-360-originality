@@ -12,14 +12,15 @@ import {
   Receipt,
   ArrowUpRight,
   ArrowDownLeft,
-  Building
+  Building,
+  Car
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { hasModulePermission } from "../lib/permissions";
-export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, onNavigate, currentUser, selectedBranch, businessProfile }) {
+export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, onNavigate, currentUser, selectedBranch, businessProfile, onRefreshData }) {
   const [loans, setLoans] = useState([]);
   const [allLoans, setAllLoans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,8 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
         loanType: "Vehicle Loan",
         purchaseId: initialPurchase.purchase_id || initialPurchase.id || "",
         financeName: initialPurchase.binding?.financierName || "",
-        bindingAmount: String(initialPurchase.binding?.bindingAmount || initialPurchase.purchase_price || ""),
-        takenAmount: String(initialPurchase.binding?.takenAmount || initialPurchase.purchase_price || ""),
+        bindingAmount: String(initialPurchase.binding?.bindingAmount || ""),
+        takenAmount: String(initialPurchase.binding?.takenAmount || ""),
         dueAmount: String(initialPurchase.binding?.dueAmount || ""),
         monthlyPayAmount: String(initialPurchase.binding?.dueAmount ? Math.round(Number(initialPurchase.binding.dueAmount) / 12) : "")
       }));
@@ -95,6 +96,12 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
   const activeVehicles = useMemo(() => {
     return vehicles.filter((v) => v.status === "Available" && !v.isDeleted);
   }, [vehicles]);
+  const selectedVehicleDetails = useMemo(() => {
+    if (formData.loanType === "Vehicle Loan" && formData.purchaseId) {
+      return vehicles.find((v) => v.id === formData.purchaseId);
+    }
+    return null;
+  }, [formData.purchaseId, formData.loanType, vehicles]);
   useEffect(() => {
     if (formData.loanType === "Vehicle Loan" && formData.purchaseId) {
       const v = vehicles.find((item) => item.id === formData.purchaseId);
@@ -102,9 +109,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
         setFormData((prev) => ({
           ...prev,
           customerName: v.ownerDetails || "Vehicle Loan Customer",
-          mobileNumber: "",
-          bindingAmount: String(v.purchasePrice || ""),
-          takenAmount: String(v.purchasePrice || "")
+          mobileNumber: ""
         }));
       }
     }
@@ -178,6 +183,9 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
             });
           }
         }
+        if (onRefreshData) {
+          await onRefreshData();
+        }
         setFormData({
           loanType: "Vehicle Loan",
           purchaseId: "",
@@ -221,7 +229,9 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
           referenceNumber: "",
           remarks: ""
         });
-        if (onNavigate) {
+        if (onRefreshData) {
+          await onRefreshData();
+        } else {
           fetch("/api/vouchers").then((res2) => res2.json()).then(() => console.log("Automatic receipts & vouchers consolidated successfully."));
         }
       }
@@ -241,6 +251,9 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
             if (selectedLoan?.id === id) {
               setShowLoanDetailsModal(false);
               setSelectedLoan(null);
+            }
+            if (onRefreshData) {
+              await onRefreshData();
             }
           }
         } catch (err) {
@@ -331,13 +344,13 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
       doc.setFontSize(11);
       doc.setTextColor(30, 41, 59);
       doc.text("FINANCIAL BREAKDOWN", 20, financeY);
-      const totalPaid = Number(loan.takenAmount) - Number(loan.dueAmount);
+      const totalPaid = (Number(loan?.takenAmount) || 0) - (Number(loan?.dueAmount) || 0);
       const financeRows = [
-        ["Binding / Asset Valuation", `INR ${loan.bindingAmount.toLocaleString("en-IN")}`],
-        ["Loan Amount Taken", `INR ${loan.takenAmount.toLocaleString("en-IN")}`],
-        ["Total Cumulative Paid Amount", `INR ${totalPaid.toLocaleString("en-IN")}`],
-        ["Current Outstanding Balance Due", `INR ${loan.dueAmount.toLocaleString("en-IN")}`],
-        ["Estimated Monthly EMI Payment", `INR ${loan.monthlyPayAmount.toLocaleString("en-IN")}`]
+        ["Binding / Asset Valuation", `INR ${(Number(loan?.bindingAmount) || 0).toLocaleString("en-IN")}`],
+        ["Loan Amount Taken", `INR ${(Number(loan?.takenAmount) || 0).toLocaleString("en-IN")}`],
+        ["Total Cumulative Paid Amount", `INR ${(Number(totalPaid) || 0).toLocaleString("en-IN")}`],
+        ["Current Outstanding Balance Due", `INR ${(Number(loan?.dueAmount) || 0).toLocaleString("en-IN")}`],
+        ["Estimated Monthly EMI Payment", `INR ${(Number(loan?.monthlyPayAmount) || 0).toLocaleString("en-IN")}`]
       ];
       autoTable(doc, {
         startY: financeY + 4,
@@ -494,7 +507,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Active Valuation</p>
-            <p className="text-xl font-extrabold text-slate-900">₹{stats.totalBinding.toLocaleString("en-IN")}</p>
+            <p className="text-xl font-extrabold text-slate-900">₹{(Number(stats?.totalBinding) || 0).toLocaleString("en-IN")}</p>
           </div>
         </div>
 
@@ -504,7 +517,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Disbursed (Taken)</p>
-            <p className="text-xl font-extrabold text-slate-900">₹{stats.totalTaken.toLocaleString("en-IN")}</p>
+            <p className="text-xl font-extrabold text-slate-900">₹{(Number(stats?.totalTaken) || 0).toLocaleString("en-IN")}</p>
           </div>
         </div>
 
@@ -514,7 +527,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paid Principal</p>
-            <p className="text-xl font-extrabold text-emerald-700">₹{stats.totalPaid.toLocaleString("en-IN")}</p>
+            <p className="text-xl font-extrabold text-emerald-700">₹{(Number(stats?.totalPaid) || 0).toLocaleString("en-IN")}</p>
           </div>
         </div>
 
@@ -524,7 +537,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Outstanding Balance</p>
-            <p className="text-xl font-extrabold text-rose-600">₹{stats.totalDue.toLocaleString("en-IN")}</p>
+            <p className="text-xl font-extrabold text-rose-600">₹{(Number(stats?.totalDue) || 0).toLocaleString("en-IN")}</p>
           </div>
         </div>
       </div>
@@ -663,11 +676,11 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                         {l.financeName || <span className="text-slate-400 italic">Self Disbursed</span>}
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-bold text-slate-900">
-                        ₹{l.takenAmount.toLocaleString("en-IN")}
+                        ₹{(Number(l?.takenAmount) || 0).toLocaleString("en-IN")}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end">
-                          <span className="text-sm font-bold text-rose-600">₹{l.dueAmount.toLocaleString("en-IN")}</span>
+                          <span className="text-sm font-bold text-rose-600">₹{(Number(l?.dueAmount) || 0).toLocaleString("en-IN")}</span>
                           <span className="text-[9px] text-slate-400 font-bold">{paidPct}% Paid</span>
                         </div>
                       </td>
@@ -729,7 +742,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
     /* Add New Loan Modal */
   }
       <AnimatePresence>
-        {showAddModal && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {showAddModal && <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -767,42 +780,95 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                     </select>
                   </div>
 
-                  {formData.loanType === "Vehicle Loan" ? <div className="col-span-2 space-y-1.5">
+                  {formData.loanType === "Vehicle Loan" ? (
+                    <div className="col-span-2 space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 uppercase">Collateral Vehicle Lookup</label>
                       <select
-    value={formData.purchaseId}
-    onChange={(e) => setFormState((prev) => ({ ...prev, purchaseId: e.target.value }))}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-    required
-  >
+                        value={formData.purchaseId}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, purchaseId: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-bold"
+                        required
+                      >
                         <option value="">Select available vehicle...</option>
-                        {activeVehicles.map((v) => <option key={v.id} value={v.id}>
-                            {v.name} ({v.regNo}) - Base cost: INR {v.purchasePrice.toLocaleString("en-IN")}
-                          </option>)}
+                        {activeVehicles.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} ({v.regNo || "No Reg"}) - Cost: ₹{(v.purchasePrice || 0).toLocaleString("en-IN")}
+                          </option>
+                        ))}
                       </select>
-                    </div> : <>
+
+                      {/* Premium Pre-filled Vehicle Details Card */}
+                      {selectedVehicleDetails && (
+                        <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl p-2 h-28 overflow-hidden shadow-sm relative group">
+                            {selectedVehicleDetails.photo || selectedVehicleDetails.vehicle_image || selectedVehicleDetails.image || (selectedVehicleDetails.photos && selectedVehicleDetails.photos[0]) ? (
+                              <img 
+                                src={selectedVehicleDetails.photo || selectedVehicleDetails.vehicle_image || selectedVehicleDetails.image || (selectedVehicleDetails.photos && selectedVehicleDetails.photos[0])} 
+                                alt={selectedVehicleDetails.name} 
+                                className="object-cover w-full h-full rounded-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-slate-400 py-4">
+                                <Car size={28} className="opacity-30 mb-1" />
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider">No Photo</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 grid grid-cols-2 gap-x-4 gap-y-2.5 text-left">
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Vehicle Number</span>
+                              <span className="text-xs font-mono font-bold text-slate-800">{selectedVehicleDetails.regNo || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Brand / Model</span>
+                              <span className="text-xs font-bold text-slate-800">{selectedVehicleDetails.brand || "N/A"} / {selectedVehicleDetails.model || selectedVehicleDetails.name || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Engine Number</span>
+                              <span className="text-xs font-mono font-bold text-slate-800">{selectedVehicleDetails.engineNo || selectedVehicleDetails.engineNumber || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Chassis Number</span>
+                              <span className="text-xs font-mono font-bold text-slate-800">{selectedVehicleDetails.chassisNo || selectedVehicleDetails.chassisNumber || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Purchase Date</span>
+                              <span className="text-xs font-bold text-slate-800">{selectedVehicleDetails.purchaseDate || selectedVehicleDetails.createdAt ? new Date(selectedVehicleDetails.purchaseDate || selectedVehicleDetails.createdAt).toLocaleDateString("en-IN") : "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">Purchase Price</span>
+                              <span className="text-xs font-bold text-emerald-600">₹{(selectedVehicleDetails.purchasePrice || 0).toLocaleString("en-IN")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-600 uppercase">Borrower Customer Name</label>
                         <input
-    type="text"
-    value={formData.customerName}
-    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-    placeholder="e.g. Rahul Sharma"
-    required
-  />
+                          type="text"
+                          value={formData.customerName}
+                          onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                          placeholder="e.g. Rahul Sharma"
+                          required
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-600 uppercase">Mobile Number</label>
                         <input
-    type="text"
-    value={formData.mobileNumber}
-    onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-    placeholder="9876543210"
-  />
+                          type="text"
+                          value={formData.mobileNumber}
+                          onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                          placeholder="9876543210"
+                        />
                       </div>
-                    </>}
+                    </>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 uppercase">Binding / Disbursal Date</label>
@@ -896,7 +962,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
     /* View Loan Details & Receipts Tabbed Modal */
   }
       <AnimatePresence>
-        {showLoanDetailsModal && selectedLoan && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {showLoanDetailsModal && selectedLoan && <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -982,15 +1048,15 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Binding Assets Valuation</p>
-                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{selectedLoan.bindingAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{(Number(selectedLoan?.bindingAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Principal Taken Amount</p>
-                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{selectedLoan.takenAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{(Number(selectedLoan?.takenAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Estimated Monthly repays EMI</p>
-                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{selectedLoan.monthlyPayAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">₹{(Number(selectedLoan?.monthlyPayAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Disbursed Date</p>
@@ -1016,13 +1082,13 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                     <div>
                       <p className="font-extrabold uppercase text-blue-800 tracking-wider">Outstanding Security Summary</p>
                       <p className="text-slate-600 mt-1">
-                        Out of <b>₹{selectedLoan.takenAmount.toLocaleString("en-IN")}</b> principal, 
-                        the user has currently repaid a total of <b>₹{(selectedLoan.takenAmount - selectedLoan.dueAmount).toLocaleString("en-IN")}</b>.
+                        Out of <b>₹{(Number(selectedLoan?.takenAmount) || 0).toLocaleString("en-IN")}</b> principal, 
+                        the user has currently repaid a total of <b>₹{((Number(selectedLoan?.takenAmount) || 0) - (Number(selectedLoan?.dueAmount) || 0)).toLocaleString("en-IN")}</b>.
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Current Outstanding Balance Due</p>
-                      <p className="text-base font-extrabold text-blue-950">₹{selectedLoan.dueAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-base font-extrabold text-blue-950">₹{(Number(selectedLoan?.dueAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                   </div>
                 </div> : <div className="space-y-6">
@@ -1032,15 +1098,15 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left">
                     <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Loan Amount</p>
-                      <p className="text-base font-extrabold text-slate-900 mt-1">₹{selectedLoan.takenAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-base font-extrabold text-slate-900 mt-1">₹{(Number(selectedLoan?.takenAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Paid Amount</p>
-                      <p className="text-base font-extrabold text-emerald-600 mt-1">₹{(selectedLoan.receipts || []).reduce((sum, r) => sum + Number(r.amountPaid || 0), 0).toLocaleString("en-IN")}</p>
+                      <p className="text-base font-extrabold text-emerald-600 mt-1">₹{(selectedLoan?.receipts || []).reduce((sum, r) => sum + Number(r.amountPaid || 0), 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
                       <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Pending Amount</p>
-                      <p className="text-base font-extrabold text-rose-600 mt-1">₹{selectedLoan.dueAmount.toLocaleString("en-IN")}</p>
+                      <p className="text-base font-extrabold text-rose-600 mt-1">₹{(Number(selectedLoan?.dueAmount) || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
                       <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Next Due Date</p>
@@ -1163,7 +1229,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
                           </div> : selectedLoan.receipts.map((rec) => <div key={rec.id} className="p-4 hover:bg-slate-50/70 transition-colors text-xs space-y-1">
                               <div className="flex justify-between items-center">
                                 <span className="font-bold text-slate-800 text-[11px] font-mono">{rec.id}</span>
-                                <span className="font-extrabold text-emerald-600">₹{rec.amountPaid.toLocaleString("en-IN")}</span>
+                                <span className="font-extrabold text-emerald-600">₹{(Number(rec?.amountPaid) || 0).toLocaleString("en-IN")}</span>
                               </div>
                               <div className="flex justify-between text-slate-500">
                                 <span className="font-medium">Paid: {rec.receiptDate}</span>

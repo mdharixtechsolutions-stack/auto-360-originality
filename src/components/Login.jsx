@@ -34,9 +34,73 @@ export default function Login({ onLogin, error, businessProfile }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isCookieBlocked, setIsCookieBlocked] = useState(false);
   const [selectedLang, setSelectedLang] = useState("en");
-  
-  // Parallax background offset states
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [cpUsername, setCpUsername] = useState("");
+  const [cpCurrentPassword, setCpCurrentPassword] = useState("");
+  const [cpNewPassword, setCpNewPassword] = useState("");
+  const [cpConfirmPassword, setCpConfirmPassword] = useState("");
+  const [cpError, setCpError] = useState("");
+  const [cpSuccess, setCpSuccess] = useState("");
+  const [cpLoading, setCpLoading] = useState(false);
+
+  const handleOpenChangePassword = () => {
+    setCpUsername(email || "");
+    setCpCurrentPassword("");
+    setCpNewPassword("");
+    setCpConfirmPassword("");
+    setCpError("");
+    setCpSuccess("");
+    setShowChangePasswordModal(true);
+  };
+
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setCpError("");
+    setCpSuccess("");
+    if (!cpUsername.trim()) {
+      setCpError("Username or email is required");
+      return;
+    }
+    if (!cpCurrentPassword) {
+      setCpError("Current password is required");
+      return;
+    }
+    if (cpNewPassword.length < 6) {
+      setCpError("New password must be at least 6 characters long");
+      return;
+    }
+    if (cpNewPassword !== cpConfirmPassword) {
+      setCpError("New password and confirm password do not match");
+      return;
+    }
+    setCpLoading(true);
+    try {
+      const res = await fetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: cpUsername.trim(),
+          currentPassword: cpCurrentPassword,
+          newPassword: cpNewPassword
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCpSuccess(data.message || "Password changed successfully!");
+        setCpCurrentPassword("");
+        setCpNewPassword("");
+        setCpConfirmPassword("");
+      } else {
+        setCpError(data.error || "Failed to change password");
+      }
+    } catch (err) {
+      setCpError("Network error. Please try again.");
+    } finally {
+      setCpLoading(false);
+    }
+  };
 
   // Floating particles
   const [particles, setParticles] = useState([]);
@@ -615,10 +679,10 @@ export default function Login({ onLogin, error, businessProfile }) {
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert("Please get in touch with your assigned IT Super Administrator or HR team to reset your ERP access tokens.")}
+                  onClick={handleOpenChangePassword}
                   className="text-[11px] font-extrabold text-blue-400 hover:text-blue-300 transition-colors cursor-pointer outline-none"
                 >
-                  Forgot Password?
+                  Change Password?
                 </button>
               </div>
 
@@ -663,6 +727,124 @@ export default function Login({ onLogin, error, businessProfile }) {
         </div>
 
       </div>
+
+      {/* CHANGE PASSWORD MODAL */}
+      <AnimatePresence>
+        {showChangePasswordModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0b1329] border border-slate-700/60 rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative text-slate-100"
+            >
+              <button
+                type="button"
+                onClick={() => setShowChangePasswordModal(false)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+
+              <div className="mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3">
+                  <Lock size={22} />
+                </div>
+                <h3 className="text-xl font-bold text-white">Change Account Password</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Update your access credentials with bcrypt encryption & JWT authorization
+                </p>
+              </div>
+
+              <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+                {cpError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold rounded-xl">
+                    {cpError}
+                  </div>
+                )}
+                {cpSuccess && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-xl">
+                    {cpSuccess}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Username / Email Address
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={cpUsername}
+                    onChange={(e) => setCpUsername(e.target.value)}
+                    placeholder="e.g. admin or john@auto360.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={cpCurrentPassword}
+                    onChange={(e) => setCpCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    New Password (Min 6 chars)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={cpNewPassword}
+                    onChange={(e) => setCpNewPassword(e.target.value)}
+                    placeholder="Enter new strong password"
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={cpConfirmPassword}
+                    onChange={(e) => setCpConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowChangePasswordModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={cpLoading}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold hover:brightness-110 transition-all disabled:opacity-50"
+                  >
+                    {cpLoading ? "Updating Password..." : "Update Password"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

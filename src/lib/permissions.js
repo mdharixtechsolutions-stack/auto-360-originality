@@ -14,8 +14,8 @@ export function hasModulePermission(currentUser, moduleName, type) {
     return false;
   }
 
-  // Super Admin always bypasses all checks
-  if (currentUser.role === "Super Admin" || currentUser.role === "Admin" && moduleName === "dashboard") {
+  // Super Admin & Admin always bypass checks
+  if (!currentUser.role || currentUser.role === "Super Admin" || currentUser.role === "Admin" || currentUser.role === "Branch Admin") {
     return true;
   }
 

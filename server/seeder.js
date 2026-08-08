@@ -314,8 +314,9 @@ export function seedDatabase(db, force = false) {
     const totalCost = veh.purchase_price + veh.fuel_expense + veh.repair_expense + veh.service_expense + veh.insurance_expense + veh.rto_expense + veh.other_expense;
     const sellingPrice = Math.round((totalCost * getRandomItem([1.08, 1.12, 1.15])) / 5000) * 5000;
     const advanceAmount = getRandomItem([sellingPrice, Math.round(sellingPrice * 0.2 / 5000) * 5000]);
-    const balanceAmount = sellingPrice - advanceAmount;
     const consultancy = getRandomInt(3000, 10000);
+    const totalPrice = sellingPrice + consultancy;
+    const balanceAmount = totalPrice - advanceAmount;
     const comm = Math.round(sellingPrice * 0.02);
 
     const dealId = `S-1${String(i + 1).padStart(3, "0")}`;
@@ -329,7 +330,7 @@ export function seedDatabase(db, force = false) {
       purchasePrice: veh.purchase_price,
       expenses: totalCost - veh.purchase_price,
       sellingPrice: sellingPrice,
-      totalPrice: sellingPrice,
+      totalPrice: totalPrice,
       advanceAmount: advanceAmount,
       balanceAmount: balanceAmount,
       consultancyFees: consultancy,

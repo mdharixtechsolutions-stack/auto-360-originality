@@ -35,6 +35,7 @@ import {
 } from "recharts";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
+import { AccountingService } from "../services/AccountingService";
 
 const StatCard = ({ title, value, icon: Icon, color, subValue, onClick, trend }) => {
   const t = window.t || ((k) => k);
@@ -77,6 +78,57 @@ const StatCard = ({ title, value, icon: Icon, color, subValue, onClick, trend })
         {subValue && (
           <p className="text-[10px] text-white/70 mt-1 font-medium leading-none truncate">{t(subValue)}</p>
         )}
+      </div>
+    </motion.div>
+  );
+};
+
+const OutstandingStatCard = ({ title, totalAmount = 0, paidAmount = 0, receivedAmount = 0, outstandingAmount = 0, count = 0, icon: Icon, color, onClick, isSales = false }) => {
+  const t = window.t || ((k) => k);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3, scale: 1.015 }}
+      onClick={onClick}
+      className={cn(
+        "relative p-4 rounded-xl border flex flex-col justify-between transition-all duration-300 overflow-hidden group shadow-sm hover:shadow-md cursor-pointer active:scale-98",
+        color
+      )}
+    >
+      <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
+      <div className="absolute -bottom-6 -left-6 w-16 h-16 rounded-full bg-black/5 blur-lg pointer-events-none" />
+      
+      <div className="flex justify-between items-start relative z-10 gap-1.5">
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 shadow-inner flex items-center justify-center text-white">
+            <Icon size={16} className="stroke-[2.5]" />
+          </div>
+          <p className="text-[10px] font-extrabold text-white uppercase tracking-wider">{t(title)}</p>
+        </div>
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md border border-white/10 text-white flex items-center gap-1 shadow-sm shrink-0">
+          {count} Pending
+        </span>
+      </div>
+
+      <div className="mt-3 relative z-10 text-left">
+        <div className="flex items-baseline justify-between gap-1">
+          <span className="text-[9px] font-bold text-white/80 uppercase">Outstanding</span>
+          <h3 className="text-xl font-black text-white font-mono tracking-tight">
+            ₹{(Number(outstandingAmount) || 0).toLocaleString("en-IN")}
+          </h3>
+        </div>
+
+        <div className="mt-2 pt-2 border-t border-white/20 grid grid-cols-2 gap-2 text-[10px] text-white/90 font-medium">
+          <div>
+            <span className="text-[9px] text-white/70 block uppercase font-bold">Total</span>
+            <span className="font-mono font-extrabold">₹{(Number(totalAmount) || 0).toLocaleString("en-IN")}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-[9px] text-white/70 block uppercase font-bold">{isSales ? "Received" : "Paid"}</span>
+            <span className="font-mono font-extrabold">₹{(Number(isSales ? receivedAmount : paidAmount) || 0).toLocaleString("en-IN")}</span>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
@@ -147,7 +199,7 @@ export default function Dashboard({
       }
 
       groupings[key].totalStock += 1;
-      if (status === "Available") {
+      if (status !== "Sold" && v.vehicle_status !== "Sold" && !v.isSold) {
         groupings[key].availStock += 1;
         if (v.regNo || v.reg_no) {
           groupings[key].regNoList.push(v.regNo || v.reg_no);
@@ -448,7 +500,7 @@ export default function Dashboard({
     // Handle fresh setup where no current month vouchers exist yet
     if (currentMonthEntries.length === 0) {
        mPurchaseCost = vehicles.filter((v) => !v.isDeleted && v.createdAt && v.createdAt.startsWith(currentMonthStr)).reduce((acc, v) => acc + (v.purchasePrice || v.purchase_price || 0), 0);
-       mSalesRevenue = deals.filter((d) => !d.isDeleted && d.date && d.date.startsWith(currentMonthStr)).reduce((acc, d) => acc + (d.sellingPrice || d.totalPrice || 0), 0);
+       mSalesRevenue = deals.filter((d) => !d.isDeleted && d.date && d.date.startsWith(currentMonthStr)).reduce((acc, d) => acc + (Number(d.totalPrice) || (Number(d.sellingPrice || 0) + Number(d.consultancyFees || 0))), 0);
        mRefurbishment = expenses.filter((e) => !e.isDeleted && e.date && e.date.startsWith(currentMonthStr)).reduce((acc, e) => acc + (e.amount || 0), 0);
     }
 
@@ -469,12 +521,27 @@ export default function Dashboard({
   const availableCount = vehicles.filter((v) => v.status === "Available" && !v.isDeleted).length;
   const soldCount = vehicles.filter((v) => v.status === "Sold" && !v.isDeleted).length;
 
-  const totalPurchaseAmount = vehicles.filter((v) => !v.isDeleted).reduce((acc, v) => acc + (v.purchasePrice || v.purchase_price || 0), 0);
-  const totalSalesAmount = deals.filter((d) => !d.isDeleted && d.type === "Sell").reduce((acc, d) => acc + (d.sellingPrice || d.totalPrice || 0), 0);
-
   // Outstandings & Pending Balances
-  const salesPendingAmount = deals.filter((d) => !d.isDeleted && d.status === "Pending").reduce((acc, d) => acc + (d.balanceAmount || 0), 0);
-  const purchasePendingAmount = vehicles.filter((v) => !v.isDeleted).reduce((acc, v) => acc + (Number(v.balance) || Number(v.balance_amount) || 0), 0);
+  const customerSalesStats = useMemo(() => {
+    return AccountingService.calculateGlobalCustomerSalesStats(deals, payments, vouchers);
+  }, [deals, payments, vouchers]);
+
+  const customerPurchaseStats = useMemo(() => {
+    return AccountingService.calculateGlobalCustomerPurchaseStats(vehicles, payments, vouchers);
+  }, [vehicles, payments, vouchers]);
+
+  const supplierPurchaseStats = useMemo(() => {
+    return AccountingService.calculateGlobalSupplierPurchaseStats(vehicles, payments, vouchers);
+  }, [vehicles, payments, vouchers]);
+
+  const totalPurchaseAmount = supplierPurchaseStats.totalAmount + customerPurchaseStats.totalAmount;
+  const totalSalesAmount = customerSalesStats.totalAmount;
+
+  const customerOutstandingTotal = customerSalesStats.total + customerPurchaseStats.total;
+  const supplierOutstandingTotal = supplierPurchaseStats.total;
+
+  const salesPendingAmount = customerSalesStats.outstandingAmount;
+  const purchasePendingAmount = supplierPurchaseStats.outstandingAmount + customerPurchaseStats.outstandingAmount;
 
   const activeLoans = loans.filter((l) => l.status === "Active" && !l.isDeleted);
   const totalPendingLoanAmount = activeLoans.reduce((acc, l) => acc + (l.pendingAmount || l.balanceAmount || l.dueAmount || 0), 0);
@@ -502,7 +569,7 @@ export default function Dashboard({
       const key = d.date.substring(0, 7);
       const match = months.find((m) => m.key === key);
       if (match) {
-        match.sales += (d.sellingPrice || d.totalPrice || 0);
+        match.sales += (Number(d.totalPrice) || (Number(d.sellingPrice || 0) + Number(d.consultancyFees || 0)));
       }
     });
 
@@ -620,6 +687,37 @@ export default function Dashboard({
       
       {/* COMPACT BUSINESS OPERATIONS & FINANCIAL DESK */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <OutstandingStatCard
+          title="Customer Purchase Outstanding"
+          totalAmount={customerPurchaseStats.totalAmount}
+          paidAmount={customerPurchaseStats.paidAmount}
+          outstandingAmount={customerPurchaseStats.outstandingAmount}
+          count={customerPurchaseStats.count}
+          icon={Receipt}
+          color="bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 text-white border-amber-500/20 shadow-sm"
+          onClick={() => onNavigate("reports", { reportType: "customer_purchase_outstanding" })}
+        />
+        <OutstandingStatCard
+          title="Customer Sales Outstanding"
+          totalAmount={customerSalesStats.totalAmount}
+          receivedAmount={customerSalesStats.receivedAmount}
+          outstandingAmount={customerSalesStats.outstandingAmount}
+          count={customerSalesStats.count}
+          icon={TrendingUp}
+          color="bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white border-emerald-500/20 shadow-sm"
+          onClick={() => onNavigate("reports", { reportType: "customer_sales_outstanding" })}
+          isSales={true}
+        />
+        <OutstandingStatCard
+          title="Supplier Outstanding"
+          totalAmount={supplierPurchaseStats.totalAmount}
+          paidAmount={supplierPurchaseStats.paidAmount}
+          outstandingAmount={supplierPurchaseStats.outstandingAmount}
+          count={supplierPurchaseStats.count}
+          icon={ArrowDownCircle}
+          color="bg-gradient-to-br from-rose-600 via-red-600 to-pink-700 text-white border-rose-500/20 shadow-sm"
+          onClick={() => onNavigate("reports", { reportType: "supplier_outstanding" })}
+        />
         <StatCard
           title="Total Customers"
           value={`${customers.filter(c => !c.isDeleted).length} Members`}
@@ -630,7 +728,7 @@ export default function Dashboard({
         />
         <StatCard
           title="Total Purchase Amount"
-          value={`₹${totalPurchaseAmount.toLocaleString("en-IN")}`}
+          value={`₹${(Number(totalPurchaseAmount) || 0).toLocaleString("en-IN")}`}
           icon={ArrowUpCircle}
           color="bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 text-white border-orange-500/20 shadow-sm"
           subValue="Inward procure valuation"
@@ -638,7 +736,7 @@ export default function Dashboard({
         />
         <StatCard
           title="Total Sales Amount"
-          value={`₹${totalSalesAmount.toLocaleString("en-IN")}`}
+          value={`₹${(Number(totalSalesAmount) || 0).toLocaleString("en-IN")}`}
           icon={TrendingUp}
           color="bg-gradient-to-br from-green-500 via-emerald-600 to-green-700 text-white border-green-500/20 shadow-sm"
           subValue="Gross outward ledger sales"

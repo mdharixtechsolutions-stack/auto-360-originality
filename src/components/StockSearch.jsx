@@ -17,15 +17,18 @@ import {
   Handshake,
   Tag,
   Sparkles,
-  Smartphone
+  Smartphone,
+  Sparkle
 } from "lucide-react";
+import SalesPosterModal from "./SalesPosterModal";
 
 export default function StockSearch({
   vehicles = [],
   brands = [],
   vehicleNames = [],
   onNavigate,
-  currentUser
+  currentUser,
+  businessProfile
 }) {
   // --- Search Filters & Parameters states ---
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState("All");
@@ -41,8 +44,10 @@ export default function StockSearch({
   const [insuranceStatusFilter, setInsuranceStatusFilter] = useState("All");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // --- Detail dialog state ---
+  // --- Detail dialog & Poster modal states ---
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [posterVehicle, setPosterVehicle] = useState(null);
+  const [showPosterModal, setShowPosterModal] = useState(false);
 
   // --- Quick filter options ---
   const quickFilters = [
@@ -161,10 +166,12 @@ export default function StockSearch({
 
   // --- WhatsApp Sharing Msg Generator ---
   const handleWhatsAppShare = (v) => {
+    const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+    const phone = businessProfile?.whatsappNumber || businessProfile?.mobileNumber || "";
     const offerPrice = Math.round(v.purchasePrice ? v.purchasePrice * 1.15 : 45000);
-    const msg = `*AUTO360 AUTO CONSULTANCY - VEHICLE FOR SALE*
+    const msg = `*${compName.toUpperCase()} - VEHICLE FOR SALE*
 =========================================
-🚙 *Vehicle:* ${v.brand} ${v.name} (${v.year})
+🚙 *Vehicle:* ${v.brand || ""} ${v.name || ""} (${v.year || ""})
 🎯 *Type:* ${v.vehicleType || "Two Wheeler"}
 💰 *Offer Price:* ₹${offerPrice.toLocaleString("en-IN")}
 ⛽ *Fuel:* ${v.fuelType || "Petrol"}
@@ -172,6 +179,8 @@ export default function StockSearch({
 🔢 *Reg No:* ${v.regNo || "In Process"}
 📄 *RC:* ${v.rcType === "Card" ? "Active Smart Card" : "Paper/Pending Transfer"}
 🛡️ *Insurance:* ${v.insurance?.hasInsurance ? "Active & Current" : "Pending update"}
+${phone ? `📞 *Contact Us:* ${phone}` : ""}
+${businessProfile?.website ? `🌐 *Website:* ${businessProfile.website}` : ""}
 
 _Interested? Book an appointment or call us for a live demo/test-drive!_`;
 
@@ -510,6 +519,17 @@ _Interested? Book an appointment or call us for a live demo/test-drive!_`;
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      setPosterVehicle(v);
+                      setShowPosterModal(true);
+                    }}
+                    className="h-8 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg flex items-center justify-center gap-1 text-xs font-bold cursor-pointer transition-all"
+                    title="Generate professional vehicle sales poster"
+                  >
+                    <Sparkles size={12} className="text-indigo-600" /> Poster
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleWhatsAppShare(v)}
                     className="h-8 w-8 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg flex items-center justify-center cursor-pointer transition-all"
                     title="Prepare and share offer passport to WhatsApp"
@@ -665,6 +685,15 @@ _Interested? Book an appointment or call us for a live demo/test-drive!_`;
 
             <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end gap-2.5 shrink-0">
               <button
+                onClick={() => {
+                  setPosterVehicle(selectedVehicle);
+                  setShowPosterModal(true);
+                }}
+                className="px-4 py-2 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Sparkles size={14} className="text-indigo-600" /> Sales Poster
+              </button>
+              <button
                 onClick={() => handleWhatsAppShare(selectedVehicle)}
                 className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
               >
@@ -686,6 +715,17 @@ _Interested? Book an appointment or call us for a live demo/test-drive!_`;
           </div>
         </div>
       )}
+
+      {/* SALES POSTER MODAL */}
+      <SalesPosterModal
+        vehicle={posterVehicle}
+        businessProfile={businessProfile}
+        isOpen={showPosterModal}
+        onClose={() => {
+          setShowPosterModal(false);
+          setPosterVehicle(null);
+        }}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -41,6 +41,7 @@ import Login from "./components/Login";
 import Binding from "./components/Binding";
 import Masters from "./components/Masters";
 import AdminConsole from "./components/AdminConsole";
+import { Payments } from "./components/Payments";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import StockSearch from "./components/StockSearch";
@@ -625,174 +626,268 @@ export default function App() {
 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
-  useEffect(() => {
-    if (isLoggedIn) {
-      const loadSyncData = async () => {
-        const safeFetch = async (url) => {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-          const contentType = res.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-            throw new Error(`Expected JSON but received ${contentType || "none"}`);
-          }
-          return res.json();
-        };
-        try {
-          try {
-            const dataProfile = await safeFetch("/api/settings/profile");
-            if (dataProfile) {
-              setBusinessProfile(dataProfile);
-            }
-          } catch (err) {
-            console.warn("[Sync Business Profile Failed]", err);
-          }
-          try {
-            const dataBranches = await safeFetch("/api/branches");
-            setBranches(dataBranches);
-          } catch (err) {
-            console.warn("[Sync Branches Failed]", err);
-          }
-          try {
-            const dataCities = await safeFetch("/api/cities");
-            setCities(dataCities);
-          } catch (err) {
-            console.warn("[Sync Cities Failed]", err);
-          }
-          try {
-            const dataAreas = await safeFetch("/api/areas");
-            setAreas(dataAreas);
-          } catch (err) {
-            console.warn("[Sync Areas Failed]", err);
-          }
-          try {
-            const dataSub = await safeFetch("/api/subareas");
-            setSubAreas(dataSub);
-          } catch (err) {
-            console.warn("[Sync Sub-areas Failed]", err);
-          }
-          try {
-            const dataSuppliers = await safeFetch("/api/suppliers?limit=100");
-            if (dataSuppliers?.data) {
-              setSuppliers(dataSuppliers.data.map((item) => ({
-                id: item.supplier_id,
-                name: item.supplier_name,
-                mobile: item.supplier_mobile,
-                address: item.address,
-                cityId: item.city_id,
-                isDeleted: false,
-                createdBy: "Admin",
-                createdAt: item.created_at,
-                branch: item.branch || "Coimbatore"
-              })));
-            }
-          } catch (err) {
-            console.warn("[Sync Suppliers Failed]", err);
-          }
-          try {
-            const dataCustomers = await safeFetch("/api/customers?limit=100");
-            if (dataCustomers?.data) {
-              setCustomers(dataCustomers.data.map((item) => ({
-                id: item.customer_id,
-                name: item.customer_name,
-                mobile: item.customer_mobile,
-                address: item.address,
-                requirement: item.customer_type,
-                source: item.source,
-                leadStatus: item.customer_status === "New Lead" ? "New" : item.customer_status === "Follow Up" ? "Follow-up" : item.customer_status === "Converted" ? "Converted" : "Closed",
-                isDeleted: false,
-                createdBy: "Admin",
-                createdAt: item.created_at,
-                branch: item.branch || "Coimbatore"
-              })));
-            }
-          } catch (err) {
-            console.warn("[Sync Customers Failed]", err);
-          }
-          try {
-            const dataPurchases = await safeFetch("/api/purchases");
-            const purchasesArray = Array.isArray(dataPurchases) ? dataPurchases : (dataPurchases?.data || []);
-            setVehicles(purchasesArray.map((item) => ({
-              id: item.purchase_id,
-              name: `${item.brand_id || ""} ${item.vehicle_name_id || ""}`.trim() || "Vehicle",
-              brand: item.brand_id || "",
-              model: item.model_details || "",
-              year: Number(item.year) || 2024,
-              fuelType: item.fuel_type || "Petrol",
-              purchasePrice: Number(item.purchase_price) || 0,
-              ownerDetails: item.owner_details || "1st Owner",
-              status: item.status || "Available",
-              branch: item.branch || "Coimbatore",
-              sellerName: item.seller_name || "",
-              sellerMobile: item.seller_mobile || "",
-              sellerType: item.purchase_type || "Customer",
-              sellerId: item.seller_id || "",
-              vehicleType: item.vehicle_type || "Four Wheeler",
-              regNo: item.reg_no || "",
-              photos: item.vehicle_image ? [item.vehicle_image] : [],
-              challan: { hasChallan: item.challan_pending === "Yes", amount: 0 },
-              tyreStatus: item.tyre_status || "Good",
-              insurance: { hasInsurance: item.insurance_active === "Yes" },
-              rcType: item.rc_type || "Card",
-              noc: { hasNoc: item.noc_available === "Yes" },
-              balance: Number(item.balance_amount) || 0,
-              totalExpenses: (Number(item.fuel_expense) || 0) + (Number(item.repair_expense) || 0) + (Number(item.service_expense) || 0) + (Number(item.insurance_expense) || 0) + (Number(item.rto_expense) || 0) + (Number(item.other_expense) || 0),
-              consultancyFees: Number(item.consultancy_fees) || 0,
-              expectedSellingPrice: Number(item.expected_selling_price) || 0,
-              isDeleted: item.isDeleted || false,
-              createdBy: "Admin",
-              createdAt: item.created_at || (/* @__PURE__ */ new Date()).toISOString()
-            })));
-          } catch (err) {
-            console.warn("[Sync Purchases Failed]", err);
-          }
-          try {
-            const dataVouchers = await safeFetch("/api/vouchers");
-            if (Array.isArray(dataVouchers)) {
-              setVoucherEntries(dataVouchers);
-            }
-          } catch (err) {
-            console.warn("[Sync Vouchers Failed]", err);
-          }
-          try {
-            const dataLedgers = await safeFetch("/api/ledgers");
-            if (Array.isArray(dataLedgers)) {
-              setLedgers(dataLedgers);
-            }
-          } catch (err) {
-            console.warn("[Sync Ledgers Failed]", err);
-          }
-          try {
-            const dataExpenses = await safeFetch("/api/expenses");
-            if (Array.isArray(dataExpenses)) {
-              setExpenses(dataExpenses);
-            }
-          } catch (err) {
-            console.warn("[Sync Expenses Failed]", err);
-          }
-          try {
-            const dataDeals = await safeFetch("/api/deals");
-            const dealsArray = Array.isArray(dataDeals) ? dataDeals : (dataDeals?.data || []);
-            if (Array.isArray(dealsArray)) {
-              setDeals(dealsArray);
-            }
-          } catch (err) {
-            console.warn("[Sync Deals Failed]", err);
-          }
-          try {
-            const dataStaff = await safeFetch("/api/staff");
-            if (Array.isArray(dataStaff)) {
-              setStaff(dataStaff);
-            }
-          } catch (err) {
-            console.warn("[Sync Staff Users Failed]", err);
-          }
-        } catch (e) {
-          console.error("[Auto360 Client Sync Error]", e);
+  const loadSyncData = useCallback(async () => {
+    if (!isLoggedIn) return;
+    const safeFetch = async (url) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Expected JSON but received ${contentType || "none"}`);
+      }
+      return res.json();
+    };
+    try {
+      try {
+        const dataProfile = await safeFetch("/api/settings/profile");
+        if (dataProfile) {
+          setBusinessProfile(dataProfile);
         }
-      };
-      loadSyncData();
+      } catch (err) {
+        console.warn("[Sync Business Profile Failed]", err);
+      }
+      try {
+        const dataBranches = await safeFetch("/api/branches");
+        setBranches(dataBranches);
+      } catch (err) {
+        console.warn("[Sync Branches Failed]", err);
+      }
+      try {
+        const dataCities = await safeFetch("/api/cities");
+        setCities(dataCities);
+      } catch (err) {
+        console.warn("[Sync Cities Failed]", err);
+      }
+      try {
+        const dataAreas = await safeFetch("/api/areas");
+        setAreas(dataAreas);
+      } catch (err) {
+        console.warn("[Sync Areas Failed]", err);
+      }
+      try {
+        const dataSub = await safeFetch("/api/subareas");
+        setSubAreas(dataSub);
+      } catch (err) {
+        console.warn("[Sync Sub-areas Failed]", err);
+      }
+      try {
+        const dataSuppliers = await safeFetch("/api/suppliers?limit=100");
+        if (dataSuppliers?.data) {
+          setSuppliers(dataSuppliers.data.map((item) => ({
+            id: item.supplier_id,
+            name: item.supplier_name,
+            mobile: item.supplier_mobile,
+            address: item.address,
+            cityId: item.city_id,
+            isDeleted: false,
+            createdBy: "Admin",
+            createdAt: item.created_at,
+            branch: item.branch || "Coimbatore"
+          })));
+        }
+      } catch (err) {
+        console.warn("[Sync Suppliers Failed]", err);
+      }
+      try {
+        const dataCustomers = await safeFetch("/api/customers?limit=100");
+        if (dataCustomers?.data) {
+          setCustomers(dataCustomers.data.map((item) => ({
+            id: item.customer_id,
+            name: item.customer_name,
+            mobile: item.customer_mobile,
+            address: item.address,
+            requirement: item.customer_type,
+            source: item.source,
+            leadStatus: item.customer_status === "New Lead" ? "New" : item.customer_status === "Follow Up" ? "Follow-up" : item.customer_status === "Converted" ? "Converted" : "Closed",
+            isDeleted: false,
+            createdBy: "Admin",
+            createdAt: item.created_at,
+            branch: item.branch || "Coimbatore"
+          })));
+        }
+      } catch (err) {
+        console.warn("[Sync Customers Failed]", err);
+      }
+      try {
+        const dataPurchases = await safeFetch("/api/purchases");
+        const purchasesArray = Array.isArray(dataPurchases) ? dataPurchases : (dataPurchases?.data || []);
+        setVehicles(purchasesArray.map((item) => {
+          const purPrice = Number(item.purchase_price || item.purchasePrice) || 0;
+          const advPrice = Number(
+            item.advance_price !== undefined && item.advance_price !== null && item.advance_price !== ""
+              ? item.advance_price
+              : (item.advancePaid !== undefined && item.advancePaid !== null && item.advancePaid !== ""
+                  ? item.advancePaid
+                  : (item.advance_amount !== undefined && item.advance_amount !== null && item.advance_amount !== ""
+                      ? item.advance_amount
+                      : (item.advanceAmount !== undefined && item.advanceAmount !== null && item.advanceAmount !== ""
+                          ? item.advanceAmount
+                          : 0)))
+          ) || 0;
+          const balAmount = (item.balance_amount !== undefined && item.balance_amount !== null && item.balance_amount !== "")
+            ? Number(item.balance_amount)
+            : ((item.balanceAmount !== undefined && item.balanceAmount !== null && item.balanceAmount !== "")
+                ? Number(item.balanceAmount)
+                : Math.max(0, purPrice - advPrice));
+
+          return {
+            ...item,
+            id: item.purchase_id || item.id,
+            purchase_id: item.purchase_id || item.id,
+            name: `${item.brand_id || ""} ${item.vehicle_name_id || ""}`.trim() || "Vehicle",
+            brand: item.brand_id || "",
+            model: item.model_details || "",
+            year: Number(item.year) || 2024,
+            fuelType: item.fuel_type || "Petrol",
+            purchasePrice: purPrice,
+            purchase_price: purPrice,
+            advancePaid: advPrice,
+            advance_price: advPrice,
+            advance_amount: advPrice,
+            advanceAmount: advPrice,
+            paidAmount: advPrice,
+            balance: balAmount,
+            balance_amount: balAmount,
+            balanceAmount: balAmount,
+            ownerDetails: item.owner_details || "1st Owner",
+            status: item.status || "Available",
+            branch: item.branch || "Coimbatore",
+            sellerName: item.seller_name || item.sellerName || "",
+            seller_name: item.seller_name || item.sellerName || "",
+            sellerMobile: item.seller_mobile || item.sellerMobile || "",
+            seller_mobile: item.seller_mobile || item.sellerMobile || "",
+            sellerType: item.purchase_type || item.sellerType || "Customer",
+            purchase_type: item.purchase_type || item.sellerType || "Customer",
+            sellerId: item.seller_id || item.sellerId || "",
+            seller_id: item.seller_id || item.sellerId || "",
+            vehicleType: item.vehicle_type || "Four Wheeler",
+            regNo: item.reg_no || item.regNo || "",
+            reg_no: item.reg_no || item.regNo || "",
+            engineNo: item.engine_number || "",
+            chassisNo: item.chassis_number || "",
+            photos: item.vehicle_image ? [item.vehicle_image] : [],
+            photo: item.vehicle_image || "",
+            image: item.vehicle_image || "",
+            vehicle_image: item.vehicle_image || "",
+            purchaseDate: item.purchase_date || item.created_at || "",
+            challan: { hasChallan: item.challan_pending === "Yes", amount: 0 },
+            tyreStatus: item.tyre_status || "Good",
+            insurance: { hasInsurance: item.insurance_active === "Yes" },
+            rcType: item.rc_type || "Card",
+            noc: { hasNoc: item.noc_available === "Yes" },
+            totalExpenses: (Number(item.fuel_expense) || 0) + (Number(item.repair_expense) || 0) + (Number(item.service_expense) || 0) + (Number(item.insurance_expense) || 0) + (Number(item.rto_expense) || 0) + (Number(item.other_expense) || 0),
+            consultancyFees: Number(item.consultancy_fees) || 0,
+            expectedSellingPrice: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            expected_selling_price: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            salesPrice: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            sales_price: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            sellingPrice: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            selling_price: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            offerPrice: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            offer_price: Number(item.expected_selling_price || item.sales_price || item.salesPrice || item.expectedSellingPrice || item.offerPrice || item.offer_price || (Number(item.selling_price) > 0 ? item.selling_price : 0)) || 0,
+            isDeleted: item.isDeleted || false,
+            createdBy: "Admin",
+            createdAt: item.created_at || new Date().toISOString()
+          };
+        }));
+      } catch (err) {
+        console.warn("[Sync Purchases Failed]", err);
+      }
+      try {
+        const dataVouchers = await safeFetch("/api/vouchers");
+        if (Array.isArray(dataVouchers)) {
+          setVoucherEntries(dataVouchers);
+        }
+      } catch (err) {
+        console.warn("[Sync Vouchers Failed]", err);
+      }
+      try {
+        const dataLedgers = await safeFetch("/api/ledgers");
+        if (Array.isArray(dataLedgers)) {
+          setLedgers(dataLedgers);
+        }
+      } catch (err) {
+        console.warn("[Sync Ledgers Failed]", err);
+      }
+      try {
+        const dataExpenses = await safeFetch("/api/expenses");
+        if (Array.isArray(dataExpenses)) {
+          setExpenses(dataExpenses);
+        }
+      } catch (err) {
+        console.warn("[Sync Expenses Failed]", err);
+      }
+      try {
+        const dataDeals = await safeFetch("/api/deals");
+        const dealsArray = Array.isArray(dataDeals) ? dataDeals : (dataDeals?.data || []);
+        if (Array.isArray(dealsArray)) {
+          setDeals(dealsArray);
+        }
+      } catch (err) {
+        console.warn("[Sync Deals Failed]", err);
+      }
+      try {
+        const dataStaff = await safeFetch("/api/staff");
+        if (Array.isArray(dataStaff)) {
+          setStaff(dataStaff);
+        }
+      } catch (err) {
+        console.warn("[Sync Staff Users Failed]", err);
+      }
+      try {
+        const dataPayments = await safeFetch("/api/payments");
+        if (Array.isArray(dataPayments)) {
+          setPayments(dataPayments);
+        }
+      } catch (err) {
+        console.warn("[Sync Payments Failed]", err);
+      }
+    } catch (e) {
+      console.error("[Auto360 Client Sync Error]", e);
     }
   }, [isLoggedIn]);
+
+  const handleSavePayment = async (paymentData) => {
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paymentData)
+      });
+      if (!res.ok) throw new Error("Failed to save payment");
+      await loadSyncData();
+      return true;
+    } catch (err) {
+      console.error("Error saving payment:", err);
+      throw err;
+    }
+  };
+
+  const handleDeletePayment = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this payment record?")) return;
+    try {
+      const res = await fetch(`/api/payments/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete payment");
+      await loadSyncData();
+    } catch (err) {
+      console.error("Error deleting payment:", err);
+    }
+  };
+
+  // Initial load and live real-time sync polling interval (every 4 seconds for ultra responsive live dashboards/states)
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadSyncData();
+      const pollInterval = setInterval(() => {
+        loadSyncData();
+      }, 4000);
+      window.refreshAuto360ERP = loadSyncData;
+      return () => {
+        clearInterval(pollInterval);
+        delete window.refreshAuto360ERP;
+      };
+    }
+  }, [isLoggedIn, loadSyncData]);
   const handleLogin = async (username, password, branch) => {
     try {
       const response = await axios.post("/api/login", { username, password, branch }, {
@@ -1062,13 +1157,15 @@ export default function App() {
           "expense",
           "inventory",
           "balance_pending",
+          "customer_sales_outstanding",
+          "customer_outstanding",
           "rc_pending",
           "insurance_pending",
           "area_stock"
         ];
         if (!allowed.includes(rId)) return false;
       } else if (role === "Staff" || role === "Sales") {
-        const allowed = ["sales", "customer", "inventory", "balance_pending"];
+        const allowed = ["sales", "customer", "inventory", "balance_pending", "customer_sales_outstanding", "customer_outstanding"];
         if (!allowed.includes(rId)) return false;
       }
     }
@@ -1149,6 +1246,19 @@ export default function App() {
       path: "/sales"
     },
     {
+      id: "payments",
+      label: "Payments",
+      icon: CreditCard,
+      subItems: [
+        { id: "customer_payments", label: "Customer Payments", view: "payments", path: "/payments/customer", state: { paymentsSubTab: "customer" } },
+        { id: "supplier_payments", label: "Supplier Payments", view: "payments", path: "/payments/supplier", state: { paymentsSubTab: "supplier" } },
+        { id: "sales_receipts", label: "Sales Receipts", view: "payments", path: "/payments/sales_receipts", state: { paymentsSubTab: "sales_receipts" } },
+        { id: "payment_history", label: "Payment History", view: "payments", path: "/payments/history", state: { paymentsSubTab: "history" } },
+        { id: "payment_reports", label: "Payment Reports", view: "payments", path: "/payments/reports", state: { paymentsSubTab: "reports" } },
+        { id: "outstanding_summary", label: "Outstanding Summary", view: "payments", path: "/payments/summary", state: { paymentsSubTab: "summary" } }
+      ]
+    },
+    {
       id: "expenses",
       label: "Expenses",
       icon: TrendingDown,
@@ -1175,10 +1285,12 @@ export default function App() {
       subItems: [
         { id: "sales", label: "Sales Report", view: "reports", path: "/reports", state: { reportType: "sales" } },
         { id: "purchase", label: "Purchase Report", view: "reports", path: "/reports", state: { reportType: "purchase" } },
+        { id: "customer_outstanding", label: "Customer Outstanding", view: "reports", path: "/reports", state: { reportType: "customer_outstanding" } },
+        { id: "supplier_outstanding", label: "Supplier Outstanding", view: "reports", path: "/reports", state: { reportType: "supplier_outstanding" } },
         { id: "customer", label: "Customer Report", view: "reports", path: "/reports", state: { reportType: "customer" } },
         { id: "expense", label: "Expense Report", view: "reports", path: "/reports", state: { reportType: "expense" } },
         { id: "inventory", label: "Inventory Report", view: "reports", path: "/reports", state: { reportType: "inventory" } },
-        { id: "balance_pending", label: "Balance Pending", view: "reports", path: "/reports", state: { reportType: "balance_pending" } },
+        { id: "customer_sales_outstanding", label: "Customer Sales Outstanding", view: "reports", path: "/reports", state: { reportType: "customer_sales_outstanding" } },
         { id: "rc_pending", label: "RC Pending", view: "reports", path: "/reports", state: { reportType: "rc_pending" } },
         { id: "insurance_pending", label: "Insurance Pending", view: "reports", path: "/reports", state: { reportType: "insurance_pending" } },
         { id: "binding_loan", label: "Binding Loan Report", view: "reports", path: "/reports", state: { reportType: "binding_loan" } },
@@ -1267,6 +1379,13 @@ export default function App() {
       setSafeActiveView("binding");
     } else if (path === "/sales") {
       setSafeActiveView("sales");
+    } else if (path.startsWith("/payments")) {
+      if (path === "/payments/customer") setSafeActiveView("payments", { paymentsSubTab: "customer" });
+      else if (path === "/payments/supplier") setSafeActiveView("payments", { paymentsSubTab: "supplier" });
+      else if (path === "/payments/history") setSafeActiveView("payments", { paymentsSubTab: "history" });
+      else if (path === "/payments/reports") setSafeActiveView("payments", { paymentsSubTab: "reports" });
+      else if (path === "/payments/summary") setSafeActiveView("payments", { paymentsSubTab: "summary" });
+      else setSafeActiveView("payments", { paymentsSubTab: "customer" });
     } else if (path === "/expenses") {
       setSafeActiveView("expenses");
     } else if (path === "/accounts") {
@@ -1386,8 +1505,17 @@ export default function App() {
           cities={cities}
           areas={areas}
           subAreas={subAreas}
+          purchases={branchFilteredVehicles}
+          deals={branchFilteredDeals}
+          payments={payments}
+          vouchers={voucherEntries}
           currentUser={currentUser}
           initialSearch={navigationState.search}
+          businessProfile={businessProfile}
+          onNavigate={handleNavigate}
+          onRefreshData={loadSyncData}
+          payments={payments}
+          vouchers={voucherEntries}
         />;
       case "purchase":
         return <Purchase
@@ -1406,6 +1534,9 @@ export default function App() {
           currentUser={currentUser}
           businessProfile={businessProfile}
           initialSearch={navigationState.search}
+          onRefreshData={loadSyncData}
+          payments={payments}
+          vouchers={voucherEntries}
         />;
       case "stock_search":
         return <StockSearch
@@ -1414,6 +1545,7 @@ export default function App() {
           vehicleNames={vehicleNames}
           onNavigate={handleNavigate}
           currentUser={currentUser}
+          businessProfile={businessProfile}
         />;
       case "binding":
         return <Binding
@@ -1425,12 +1557,15 @@ export default function App() {
           onNavigate={handleNavigate}
           currentUser={currentUser}
           businessProfile={businessProfile}
+          onRefreshData={loadSyncData}
         />;
       case "sales":
         return <Sales
           vehicles={branchFilteredVehicles}
           customers={branchFilteredCustomers}
           deals={branchFilteredDeals}
+          payments={payments}
+          vouchers={voucherEntries}
           onUpdateDeals={setDeals}
           onUpdateVehicles={setVehicles}
           onUpdateCustomers={setCustomers}
@@ -1439,6 +1574,22 @@ export default function App() {
           currentUser={currentUser}
           businessProfile={businessProfile}
           initialSearch={navigationState.search}
+          onRefreshData={loadSyncData}
+        />;
+      case "payments":
+        return <Payments
+          deals={branchFilteredDeals}
+          vehicles={branchFilteredVehicles}
+          customers={branchFilteredCustomers}
+          suppliers={suppliers}
+          vouchers={voucherEntries}
+          payments={payments}
+          onSavePayment={handleSavePayment}
+          onDeletePayment={handleDeletePayment}
+          currentBranch={currentUser?.branch || selectedBranch || "Coimbatore"}
+          initialSubTab={navigationState.paymentsSubTab || "customer"}
+          businessProfile={businessProfile}
+          onRefreshData={loadSyncData}
         />;
       case "expenses":
         return <Expenses
@@ -1447,6 +1598,7 @@ export default function App() {
           onNavigate={handleNavigate}
           vehicles={branchFilteredVehicles}
           currentUser={currentUser}
+          onRefreshData={loadSyncData}
         />;
       case "accounts":
         return <Accounts
@@ -1459,6 +1611,7 @@ export default function App() {
           currentUser={currentUser}
           vehicles={vehicles}
           businessProfile={businessProfile}
+          onRefreshData={loadSyncData}
         />;
       case "reports":
         return <Reports
@@ -1468,6 +1621,9 @@ export default function App() {
           customers={branchFilteredCustomers}
           expenses={branchFilteredExpenses}
           branches={branches}
+          vouchers={voucherEntries}
+          suppliers={suppliers}
+          payments={payments}
           initialReport={navigationState.reportType}
           onNavigate={handleNavigate}
           currentUser={currentUser}
@@ -1492,6 +1648,9 @@ export default function App() {
           subAreas={subAreas}
           suppliers={suppliers}
           customers={customers}
+          purchases={branchFilteredVehicles}
+          payments={payments}
+          vouchers={voucherEntries}
           onUpdateBrands={setBrands}
           onUpdateVehicleNames={setVehicleNames}
           onUpdateCities={setCities}

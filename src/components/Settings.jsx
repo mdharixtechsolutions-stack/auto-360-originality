@@ -16,6 +16,7 @@ import {
 import { cn } from "../lib/utils";
 import { hasModulePermission } from "../lib/permissions";
 import { useLanguage } from "../localization/LanguageContext";
+import { INDIAN_STATES } from "../data/indianStates";
 
 export default function Settings({ initialTab, currentUser, businessProfile, setBusinessProfile }) {
   const [activeSection, setActiveSection] = useState(initialTab || "general");
@@ -72,7 +73,13 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
   }
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[460px]">
         <div className="p-8">
-          {activeSection === "general" && <GeneralSettings />}
+          {activeSection === "general" && (
+            <GeneralSettings 
+              businessProfile={businessProfile} 
+              setBusinessProfile={setBusinessProfile} 
+              showToast={showToast} 
+            />
+          )}
           {activeSection === "profile" && (
             <BusinessProfile 
               businessProfile={businessProfile} 
@@ -89,17 +96,113 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
       </div>
     </div>;
 }
-function GeneralSettings() {
+function GeneralSettings({ businessProfile, setBusinessProfile, showToast }) {
   const { language, setLanguage, t } = useLanguage();
-  return <div className="space-y-6">
+  const [appName, setAppName] = useState(businessProfile?.companyName || "AUTO360 ERP");
+  const [defaultState, setDefaultState] = useState(businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const loadGenSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/general");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.appName) setAppName(data.appName);
+          if (data.defaultState) setDefaultState(data.defaultState);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch general settings on mount:", e);
+      }
+    };
+    loadGenSettings();
+  }, []);
+
+  useEffect(() => {
+    if (businessProfile) {
+      if (businessProfile.companyName) setAppName(businessProfile.companyName);
+      if (businessProfile.defaultState || businessProfile.state) {
+        setDefaultState(businessProfile.defaultState || businessProfile.state);
+      }
+    }
+  }, [businessProfile]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const genPayload = {
+        appName,
+        defaultState,
+        currency: "INR (₹)",
+        timezone: "Asia/Kolkata",
+        language
+      };
+      await fetch("/api/settings/general", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(genPayload)
+      });
+
+      const updated = {
+        ...(businessProfile || {}),
+        companyName: appName,
+        defaultState,
+        state: defaultState
+      };
+      const res = await fetch("/api/settings/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+      if (!res.ok) throw new Error("Failed to save general settings");
+      const data = await res.json();
+      if (data.success && setBusinessProfile) {
+        setBusinessProfile(data.business_profile);
+      }
+      if (showToast) showToast("General Settings saved successfully! Default State updated.");
+    } catch (err) {
+      console.error(err);
+      if (showToast) showToast("Failed to save settings: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSave} className="space-y-6">
       <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
         <Globe size={18} className="text-brand-600" /> {t("General Configuration", "General Configuration")}
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Application Name", "Application Name")}</label>
-          <input type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900" defaultValue="Auto Consultancy Admin" />
+          <input 
+            type="text" 
+            value={appName}
+            onChange={(e) => setAppName(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900" 
+          />
         </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            {t("Default State", "Default State")}
+            <span className="text-brand-600 font-extrabold text-[10px] bg-brand-50 px-2 py-0.5 rounded-full">(For Purchases)</span>
+          </label>
+          <select 
+            value={defaultState}
+            onChange={(e) => setDefaultState(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900"
+          >
+            {INDIAN_STATES.map((s) => (
+              <option key={s.code} value={s.label}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Default Currency", "Default Currency")}</label>
           <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900">
@@ -107,12 +210,14 @@ function GeneralSettings() {
             <option>USD ($)</option>
           </select>
         </div>
+
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Timezone", "Timezone")}</label>
           <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900">
             <option>(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
           </select>
         </div>
+
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Language", "Language")}</label>
           <select 
@@ -129,7 +234,19 @@ function GeneralSettings() {
           </select>
         </div>
       </div>
-    </div>;
+
+      <div className="flex justify-end pt-4 border-t border-slate-100">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-brand-200 text-xs uppercase tracking-wider"
+        >
+          <Save size={16} />
+          {isSaving ? "Saving..." : "Save General Settings"}
+        </button>
+      </div>
+    </form>
+  );
 }
 function BusinessProfile({ businessProfile, setBusinessProfile, showToast }) {
   const [companyName, setCompanyName] = useState(businessProfile?.companyName || "");

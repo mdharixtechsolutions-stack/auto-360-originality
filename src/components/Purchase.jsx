@@ -21,13 +21,61 @@ import {
   Share2,
   Phone,
   MapPin,
-  Globe
+  Globe,
+  CreditCard,
+  Camera,
+  ArrowRightLeft,
+  Sparkles,
+  ShieldCheck,
+  Award,
+  Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { hasModulePermission } from "../lib/permissions";
+import { getStateCode } from "../data/indianStates";
+import SalesPosterModal from "./SalesPosterModal";
+import { calculateVehiclePurchaseOutstanding } from "../lib/outstandingCalculator";
+
+const STANDARD_TOP_FEATURES = [
+  "Touch Screen Display",
+  "Reverse Parking Camera",
+  "ABS & EBD",
+  "Dual Front Airbags",
+  "Power Steering",
+  "Power Windows",
+  "Central Remote Locking",
+  "Electric Sunroof",
+  "Cruise Control",
+  "Bluetooth & USB Connectivity",
+  "Android Auto & Apple CarPlay",
+  "Front Fog Lamps",
+  "Automatic LED Headlamps",
+  "Rear Parking Sensors",
+  "Alloy Wheels",
+  "GPS Navigation System",
+  "Premium Audio System",
+  "Leatherette Seat Covers",
+  "Smart Keyless Push Start",
+  "Automatic Climate Control"
+];
+
+const STANDARD_HIGHLIGHTS = [
+  "Single Owner",
+  "Accident Free",
+  "Company Service",
+  "Finance Available",
+  "Insurance Valid",
+  "RC Ready",
+  "ABS",
+  "Touch Screen",
+  "Reverse Camera",
+  "Power Steering",
+  "Power Windows",
+  "Central Locking"
+];
 
 export default function PurchasesListAndForm({
   vehicles,
@@ -44,7 +92,9 @@ export default function PurchasesListAndForm({
   selectedBranch = "all",
   currentUser,
   businessProfile,
-  initialSearch
+  initialSearch,
+  payments = [],
+  vouchers = []
 }) {
   const [purchases, setPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +134,7 @@ export default function PurchasesListAndForm({
     loan_status: "Pending"
   });
   const [vehicleToShare, setVehicleToShare] = useState(null);
+  const [customFeatureInput, setCustomFeatureInput] = useState("");
   const [formState, setFormState] = useState({
     purchase_id: "",
     purchase_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
@@ -112,6 +163,21 @@ export default function PurchasesListAndForm({
     noc_available: "No",
     insurance_active: "No",
     vehicle_image: "",
+    vehicle_images: {
+      front: "",
+      back: "",
+      left: "",
+      right: "",
+      interior: "",
+      engine: "",
+      meter: ""
+    },
+    top_features: [],
+    vehicle_highlights: [],
+    transfer_status: "No",
+    transfer_date: "",
+    transfer_remarks: "",
+    transferred_by: "",
     rc_upload: "",
     noc_upload: "",
     insurance_doc: "",
@@ -157,44 +223,88 @@ export default function PurchasesListAndForm({
         setTotalPages(result.pagination?.totalPages || 1);
         setTotalCount(result.pagination?.totalCount || 0);
         if (result.data) {
-          const mappedVehicles = result.data.map((p) => ({
-            id: p.purchase_id,
-            name: p.vehicle_name_id,
-            brand: p.brand_id,
-            model: p.model_details,
-            year: p.year,
-            fuelType: p.fuel_type,
-            purchasePrice: p.purchase_price,
-            ownerDetails: p.owner_details,
-            status: p.status === "Available" ? "Available" : p.status === "Booked" ? "Reserved" : "Sold",
-            vehicleType: p.vehicle_type,
-            regNo: p.reg_no,
-            photos: p.vehicle_image ? [p.vehicle_image] : [],
-            challan: {
-              hasChallan: p.challan_pending === "Yes",
-              amount: p.challan_pending === "Yes" ? 500 : 0
-            },
-            tyreStatus: p.tyre_status || "Good",
-            insurance: {
-              hasInsurance: p.insurance_active === "Yes",
-              docUrl: p.insurance_doc
-            },
-            rcType: p.rc_type === "Smart Card" ? "Card" : "Paper",
-            noc: {
-              hasNoc: p.noc_available === "Yes"
-            },
-            balance: p.balance_amount,
-            totalExpenses: (Number(p.fuel_expense) || 0) + (Number(p.repair_expense) || 0) + (Number(p.service_expense) || 0) + (Number(p.insurance_expense) || 0) + (Number(p.rto_expense) || 0) + (Number(p.other_expense) || 0),
-            consultancyFees: p.consultancy_fees,
-            cityId: p.seller_city_id,
-            areaId: p.seller_area_id,
-            subAreaId: p.seller_sub_area_id,
-            sellerId: p.seller_id,
-            sellerName: p.seller_name,
-            isDeleted: p.isDeleted,
-            createdBy: "Admin",
-            createdAt: p.created_at
-          }));
+          const mappedVehicles = result.data.map((p) => {
+            const purPrice = Number(p.purchase_price || p.purchasePrice) || 0;
+            const advPrice = Number(
+              p.advance_price !== undefined && p.advance_price !== null && p.advance_price !== ""
+                ? p.advance_price
+                : (p.advancePaid !== undefined && p.advancePaid !== null && p.advancePaid !== ""
+                    ? p.advancePaid
+                    : (p.advance_amount !== undefined && p.advance_amount !== null && p.advance_amount !== ""
+                        ? p.advance_amount
+                        : (p.advanceAmount !== undefined && p.advanceAmount !== null && p.advanceAmount !== ""
+                            ? p.advanceAmount
+                            : 0)))
+            ) || 0;
+            const balAmount = (p.balance_amount !== undefined && p.balance_amount !== null && p.balance_amount !== "")
+              ? Number(p.balance_amount)
+              : ((p.balanceAmount !== undefined && p.balanceAmount !== null && p.balanceAmount !== "")
+                  ? Number(p.balanceAmount)
+                  : Math.max(0, purPrice - advPrice));
+
+            return {
+              ...p,
+              id: p.purchase_id || p.id,
+              purchase_id: p.purchase_id || p.id,
+              name: p.vehicle_name_id,
+              brand: p.brand_id,
+              model: p.model_details,
+              year: p.year,
+              fuelType: p.fuel_type,
+              purchasePrice: purPrice,
+              purchase_price: purPrice,
+              advancePaid: advPrice,
+              advance_price: advPrice,
+              advance_amount: advPrice,
+              advanceAmount: advPrice,
+              paidAmount: advPrice,
+              balance: balAmount,
+              balance_amount: balAmount,
+              balanceAmount: balAmount,
+              sellerType: p.purchase_type || p.sellerType || "Customer",
+              purchase_type: p.purchase_type || p.sellerType || "Customer",
+              sellerId: p.seller_id || p.sellerId || "",
+              seller_id: p.seller_id || p.sellerId || "",
+              sellerName: p.seller_name || p.sellerName || "",
+              seller_name: p.seller_name || p.sellerName || "",
+              sellerMobile: p.seller_mobile || p.sellerMobile || "",
+              seller_mobile: p.seller_mobile || p.sellerMobile || "",
+              ownerDetails: p.owner_details,
+              status: p.status === "Available" ? "Available" : p.status === "Booked" ? "Reserved" : "Sold",
+              vehicleType: p.vehicle_type,
+              regNo: p.reg_no || p.regNo || "",
+              reg_no: p.reg_no || p.regNo || "",
+              vehicle_image: p.vehicle_image || p.vehicle_images?.front || "",
+              vehicle_images: p.vehicle_images || { front: p.vehicle_image || "", back: "", left: "", right: "", interior: "", engine: "" },
+              photos: p.vehicle_image ? [p.vehicle_image] : (p.vehicle_images?.front ? [p.vehicle_images.front] : []),
+              transfer_status: p.transfer_status || "No",
+              transferStatus: p.transfer_status || "No",
+              transfer_date: p.transfer_date || "",
+              transfer_remarks: p.transfer_remarks || "",
+              transferred_by: p.transferred_by || "",
+              challan: {
+                hasChallan: p.challan_pending === "Yes",
+                amount: p.challan_pending === "Yes" ? 500 : 0
+              },
+              tyreStatus: p.tyre_status || "Good",
+              insurance: {
+                hasInsurance: p.insurance_active === "Yes",
+                docUrl: p.insurance_doc
+              },
+              rcType: p.rc_type === "Smart Card" ? "Card" : "Paper",
+              noc: {
+                hasNoc: p.noc_available === "Yes"
+              },
+              totalExpenses: (Number(p.fuel_expense) || 0) + (Number(p.repair_expense) || 0) + (Number(p.service_expense) || 0) + (Number(p.insurance_expense) || 0) + (Number(p.rto_expense) || 0) + (Number(p.other_expense) || 0),
+              consultancyFees: p.consultancy_fees,
+              cityId: p.seller_city_id,
+              areaId: p.seller_area_id,
+              subAreaId: p.seller_sub_area_id,
+              isDeleted: p.isDeleted,
+              createdBy: "Admin",
+              createdAt: p.created_at
+            };
+          });
           onUpdateVehicles(mappedVehicles);
         }
       }
@@ -256,6 +366,171 @@ export default function PurchasesListAndForm({
       console.error("Error loading seller auto fetch details", e);
     }
   };
+  const compressImage = (file, maxWidth = 1600, maxHeight = 1600, quality = 0.8) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type || !file.type.startsWith("image/")) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.src = url;
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+              type: "image/jpeg",
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, "image/jpeg", quality);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+    });
+  };
+
+  const processCategoryUpload = async (file, categoryKey) => {
+    if (!file) return;
+
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type.toLowerCase()) && !file.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
+      alert("Unsupported file format! Please upload a JPG, JPEG, PNG, or WEBP image.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image is too large! Maximum allowed size is 10MB.");
+      return;
+    }
+
+    const sizeStr = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
+    const progressKey = `category_${categoryKey}`;
+    
+    setUploadMetadata((prev) => ({
+      ...prev,
+      [progressKey]: { name: file.name, size: sizeStr }
+    }));
+
+    setUploadProgress((prev) => ({
+      ...prev,
+      [progressKey]: 15
+    }));
+
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        const curr = prev[progressKey] || 15;
+        if (curr >= 90) return prev;
+        return { ...prev, [progressKey]: curr + 15 };
+      });
+    }, 120);
+
+    try {
+      const compressed = await compressImage(file);
+      const formData = new FormData();
+      formData.append("file", compressed);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      clearInterval(progressInterval);
+
+      if (res.ok) {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [progressKey]: 100
+        }));
+        const data = await res.json();
+        
+        setFormState((prev) => {
+          const updatedImages = {
+            ...(prev.vehicle_images || { front: "", back: "", left: "", right: "", interior: "", engine: "" }),
+            [categoryKey]: data.filePath
+          };
+          const primaryImage = updatedImages.front || updatedImages.back || updatedImages.left || updatedImages.right || updatedImages.interior || updatedImages.engine || prev.vehicle_image;
+          return {
+            ...prev,
+            vehicle_images: updatedImages,
+            vehicle_image: primaryImage
+          };
+        });
+
+        setTimeout(() => {
+          setUploadProgress((prev) => {
+            const next = { ...prev };
+            delete next[progressKey];
+            return next;
+          });
+        }, 800);
+      } else {
+        setUploadProgress((prev) => {
+          const next = { ...prev };
+          delete next[progressKey];
+          return next;
+        });
+        alert("Failed to upload image. Please try again.");
+      }
+    } catch (err) {
+      clearInterval(progressInterval);
+      setUploadProgress((prev) => {
+        const next = { ...prev };
+        delete next[progressKey];
+        return next;
+      });
+      console.error("Error uploading category image", err);
+      alert("Error uploading category image.");
+    }
+  };
+
+  const handleCategoryFileUpload = (e, categoryKey) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processCategoryUpload(file, categoryKey);
+    }
+  };
+
+  const handleMultiCategoryUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const categories = ["front", "back", "left", "right", "interior", "engine"];
+    const currentImages = formState.vehicle_images || {};
+
+    const emptyCategories = categories.filter((c) => !currentImages[c]);
+    const targetCategories = emptyCategories.length > 0 ? emptyCategories : categories;
+
+    files.forEach((file, index) => {
+      const cat = targetCategories[index % targetCategories.length];
+      if (cat) {
+        processCategoryUpload(file, cat);
+      }
+    });
+  };
+
   const handleFileUpload = async (e, fieldName) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -366,9 +641,23 @@ export default function PurchasesListAndForm({
       balance_amount: balanceAmount
     }));
   }, [purchasePrice, advancePrice]);
-  const handleOpenAdd = () => {
+  const handleOpenAdd = async () => {
     setIsEditMode(false);
     setSelectedPurchase(null);
+    let currentState = businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu";
+    try {
+      const res = await fetch("/api/settings/general");
+      if (res.ok) {
+        const genData = await res.json();
+        if (genData?.defaultState) {
+          currentState = genData.defaultState;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch latest settings/general:", err);
+    }
+    const stateCode = getStateCode(currentState);
+    const initialRegNo = stateCode ? `${stateCode} ` : "";
     setFormState({
       purchase_id: "",
       purchase_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
@@ -383,7 +672,7 @@ export default function PurchasesListAndForm({
       vehicle_type: "Four Wheeler",
       brand_id: "",
       vehicle_name_id: "",
-      reg_no: "",
+      reg_no: initialRegNo,
       model_details: "",
       year: (/* @__PURE__ */ new Date()).getFullYear(),
       fuel_type: "Petrol",
@@ -397,6 +686,21 @@ export default function PurchasesListAndForm({
       noc_available: "No",
       insurance_active: "No",
       vehicle_image: "",
+      vehicle_images: {
+        front: "",
+        back: "",
+        left: "",
+        right: "",
+        interior: "",
+        engine: "",
+        meter: ""
+      },
+      top_features: [],
+      vehicle_highlights: [],
+      transfer_status: "No",
+      transfer_date: "",
+      transfer_remarks: "",
+      transferred_by: "",
       rc_upload: "",
       noc_upload: "",
       insurance_doc: "",
@@ -411,10 +715,39 @@ export default function PurchasesListAndForm({
     fetchNextPurchaseId();
     setShowAddEditModal(true);
   };
+
+  const handleAddCustomFeature = () => {
+    if (!customFeatureInput.trim()) return;
+    const feat = customFeatureInput.trim();
+    const current = formState.top_features || [];
+    if (!current.includes(feat)) {
+      setFormState((prev) => ({ ...prev, top_features: [...current, feat] }));
+    }
+    setCustomFeatureInput("");
+  };
+
   const handleOpenEdit = (p) => {
     setIsEditMode(true);
     setSelectedPurchase(p);
-    setFormState({ ...p });
+    const existingImages = p.vehicle_images || {
+      front: p.vehicle_image || "",
+      back: "",
+      left: "",
+      right: "",
+      interior: "",
+      engine: "",
+      meter: ""
+    };
+    setFormState({
+      ...p,
+      vehicle_images: existingImages,
+      top_features: p.top_features || p.topFeatures || [],
+      vehicle_highlights: p.vehicle_highlights || p.vehicleHighlights || [],
+      transfer_status: p.transfer_status || p.transferStatus || "No",
+      transfer_date: p.transfer_date || "",
+      transfer_remarks: p.transfer_remarks || "",
+      transferred_by: p.transferred_by || ""
+    });
     setShowAddEditModal(true);
   };
   const handleOpenLoanModal = (p) => {
@@ -470,6 +803,7 @@ export default function PurchasesListAndForm({
     });
   };
   const handleSalesIconClick = (p) => {
+    const presetSalesPrice = Number(p.expected_selling_price || p.sales_price || p.salesPrice || p.expectedSellingPrice || p.offerPrice || p.offer_price) || 0;
     const mappedVehDoc = {
       id: p.purchase_id,
       name: `${p.brand_id} - ${p.vehicle_name_id}`,
@@ -477,7 +811,16 @@ export default function PurchasesListAndForm({
       model: p.vehicle_name_id,
       year: p.year,
       fuelType: p.fuel_type,
-      purchasePrice: p.purchase_price,
+      purchasePrice: Number(p.purchase_price) || 0,
+      purchase_price: Number(p.purchase_price) || 0,
+      salesPrice: presetSalesPrice,
+      sales_price: presetSalesPrice,
+      sellingPrice: presetSalesPrice,
+      selling_price: presetSalesPrice,
+      expectedSellingPrice: presetSalesPrice,
+      expected_selling_price: presetSalesPrice,
+      offerPrice: presetSalesPrice,
+      offer_price: presetSalesPrice,
       ownerDetails: p.owner_details,
       status: p.status,
       vehicleType: p.vehicle_type,
@@ -516,9 +859,15 @@ export default function PurchasesListAndForm({
       alert("Please enter a registration number");
       return;
     }
+    const salesPriceVal = Number(formState.expected_selling_price) || 0;
     const payload = {
       ...formState,
-      balance_amount: balanceAmount
+      balance_amount: balanceAmount,
+      selling_price: salesPriceVal,
+      expected_selling_price: salesPriceVal,
+      offerPrice: salesPriceVal,
+      offer_price: salesPriceVal,
+      sales_price: salesPriceVal
     };
     setIsSaving(true);
     try {
@@ -602,6 +951,7 @@ export default function PurchasesListAndForm({
       if (businessProfile?.email) subLines.push(`Email: ${businessProfile.email}`);
       if (businessProfile?.website) subLines.push(`Web: ${businessProfile.website}`);
       if (businessProfile?.gstNumber) subLines.push(`GSTIN: ${businessProfile.gstNumber}`);
+      if (businessProfile?.cin) subLines.push(`CIN: ${businessProfile.cin}`);
 
       if (subLines.length === 0) {
         subLines.push("Automotive Consultancy \u2022 Quality Pre-Owned Vehicle Stock Receipts");
@@ -668,10 +1018,10 @@ export default function PurchasesListAndForm({
 
       const tableData = [
         ["Section Item Description", "Value Amount (INR)"],
-        ["Purchase Valuation Price", `INR ${p.purchase_price.toLocaleString("en-IN")}`],
-        ["Advance Paid Amount", `INR ${p.advance_price.toLocaleString("en-IN")}`],
-        ["Remaining Balance Amount Due", `INR ${p.balance_amount.toLocaleString("en-IN")}`],
-        ["Consultancy Service Fees", `INR ${p.consultancy_fees.toLocaleString("en-IN")}`]
+        ["Purchase Valuation Price", `INR ${(Number(p?.purchase_price) || 0).toLocaleString("en-IN")}`],
+        ["Advance Paid Amount", `INR ${(Number(p?.advance_price) || 0).toLocaleString("en-IN")}`],
+        ["Remaining Balance Amount Due", `INR ${(Number(p?.balance_amount) || 0).toLocaleString("en-IN")}`],
+        ["Consultancy Service Fees", `INR ${(Number(p?.consultancy_fees) || 0).toLocaleString("en-IN")}`]
       ];
       autoTable(doc, {
         startY: 104,
@@ -689,7 +1039,7 @@ export default function PurchasesListAndForm({
       doc.setFontSize(10);
       doc.setFont("Helvetica", "bold");
       doc.setTextColor(30, 41, 59);
-      doc.text(`Total Investment Balance: INR ${p.balance_amount.toLocaleString("en-IN")}`, 190, finalY, { align: "right" });
+      doc.text(`Total Investment Balance: INR ${(Number(p?.balance_amount) || 0).toLocaleString("en-IN")}`, 190, finalY, { align: "right" });
 
       // Dynamic Terms and Conditions rendering block
       if (businessProfile?.termsAndConditions) {
@@ -765,7 +1115,13 @@ export default function PurchasesListAndForm({
     });
   };
   const totalStockValue = purchases.reduce((acc, current) => acc + (Number(current.purchase_price) || 0), 0);
-  const totalActiveBalance = purchases.reduce((acc, current) => acc + (Number(current.balance_amount) || 0), 0);
+  const totalActiveBalance = useMemo(() => {
+    return purchases.reduce((acc, current) => {
+      if (current.isDeleted) return acc;
+      const stats = calculateVehiclePurchaseOutstanding(current, payments, vouchers);
+      return acc + stats.outstanding;
+    }, 0);
+  }, [purchases, payments, vouchers]);
   return <div className="space-y-6">
       {
     /* Title & Header Section  */
@@ -794,7 +1150,7 @@ export default function PurchasesListAndForm({
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acquisition Assets</p>
-            <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{totalStockValue.toLocaleString("en-IN")}</h3>
+            <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(totalStockValue) || 0).toLocaleString("en-IN")}</h3>
           </div>
           <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl">
             <Car size={22} />
@@ -816,7 +1172,7 @@ export default function PurchasesListAndForm({
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-amber-600">Outstanding Balance</p>
-            <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{totalActiveBalance.toLocaleString("en-IN")}</h3>
+            <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(totalActiveBalance) || 0).toLocaleString("en-IN")}</h3>
           </div>
           <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl">
             <IndianRupee size={22} />
@@ -954,6 +1310,7 @@ export default function PurchasesListAndForm({
       "booked": "bg-amber-50 text-amber-700 border-amber-200",
       "sold": "bg-slate-100 text-slate-700 border-slate-200",
       "loan active": "bg-indigo-50 text-indigo-700 border-indigo-200",
+      "binding loan closed": "bg-teal-50 text-teal-700 border-teal-200",
       "expense pending": "bg-rose-50 text-rose-700 border-rose-200"
     };
     const normalizedStatus = (p.status || "Available").toLowerCase();
@@ -1050,25 +1407,25 @@ export default function PurchasesListAndForm({
                         <div className="mt-4 pt-3 border-t border-slate-100/80 grid grid-cols-2 gap-x-4 gap-y-2.5">
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Purchase Price</p>
-                            <p className="text-xs font-bold text-slate-800">₹{purchasePrice.toLocaleString("en-IN")}</p>
+                            <p className="text-xs font-bold text-slate-800">₹{(Number(purchasePrice) || 0).toLocaleString("en-IN")}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Expenses ({expenseCount})</p>
-                            <p className="text-xs font-bold text-slate-800">₹{totalExpenses.toLocaleString("en-IN")}</p>
+                            <p className="text-xs font-bold text-slate-800">₹{(Number(totalExpenses) || 0).toLocaleString("en-IN")}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Consultancy Fees</p>
-                            <p className="text-xs font-bold text-slate-800">₹{consultancyFees.toLocaleString("en-IN")}</p>
+                            <p className="text-xs font-bold text-slate-800">₹{(Number(consultancyFees) || 0).toLocaleString("en-IN")}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Cost</p>
-                            <p className="text-xs font-extrabold text-indigo-700">₹{totalCost.toLocaleString("en-IN")}</p>
+                            <p className="text-xs font-extrabold text-indigo-700">₹{(Number(totalCost) || 0).toLocaleString("en-IN")}</p>
                           </div>
                           {expectedSellingPrice > 0 && (
                             <>
                               <div className="pt-1 border-t border-slate-100">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Offer Price</p>
-                                <p className="text-xs font-bold text-slate-800">₹{expectedSellingPrice.toLocaleString("en-IN")}</p>
+                                <p className="text-xs font-bold text-slate-800">₹{(Number(expectedSellingPrice) || 0).toLocaleString("en-IN")}</p>
                               </div>
                               <div className="text-right pt-1 border-t border-slate-100">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Potential Profit</p>
@@ -1076,7 +1433,7 @@ export default function PurchasesListAndForm({
                                   "text-xs font-extrabold",
                                   potentialProfit >= 0 ? "text-emerald-600" : "text-rose-500"
                                 )}>
-                                  ₹{potentialProfit.toLocaleString("en-IN")}
+                                  ₹{(Number(potentialProfit) || 0).toLocaleString("en-IN")}
                                 </p>
                               </div>
                             </>
@@ -1154,7 +1511,18 @@ export default function PurchasesListAndForm({
                         </span>}
 
                       {
-      /* 5. Vehicle Expense Route shortcut */
+      /* 5. Payment Button */
+    }
+                      <button
+                        onClick={() => onNavigate && onNavigate("payments", { paymentsSubTab: p.sellerType === "Customer" ? "customer" : "supplier", partyId: p.sellerId || p.supplier_id, vehicleId: p.purchase_id || p.id })}
+                        className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        title="Record Payment / Receipt for Purchase"
+                      >
+                        <CreditCard size={15} />
+                      </button>
+
+                      {
+      /* 6. Vehicle Expense Route shortcut */
     }
                       <button
       onClick={() => handleExpenseIconClick(p)}
@@ -1221,7 +1589,7 @@ export default function PurchasesListAndForm({
     /* VIEW DETAILS DRAWER / MODAL  - Exactly one view page */
   }
       <AnimatePresence>
-        {showViewModal && selectedPurchase && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        {showViewModal && selectedPurchase && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -1408,6 +1776,97 @@ export default function PurchasesListAndForm({
                   </div>
                 </div>
 
+                {/* VEHICLE IMAGES GALLERY (Front, Back, Left, Right, Interior, Engine, Meter) */}
+                <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                      <Camera size={14} className="text-indigo-600" />
+                      <span>Vehicle Images Gallery</span>
+                    </h4>
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                      Uploaded Vehicle Photos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                    {[
+                      { key: "front", label: "Front" },
+                      { key: "back", label: "Back" },
+                      { key: "left", label: "Left" },
+                      { key: "right", label: "Right" },
+                      { key: "interior", label: "Interior" },
+                      { key: "engine", label: "Engine" },
+                      { key: "meter", label: "Meter" }
+                    ].map((cat) => {
+                      const imgUrl = selectedPurchase.vehicle_images?.[cat.key] || (cat.key === "front" ? selectedPurchase.vehicle_image : "");
+                      return (
+                        <div key={cat.key} className="bg-white border border-slate-200 rounded-xl p-2 text-center flex flex-col justify-between h-[110px] overflow-hidden group shadow-sm">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1 truncate">{cat.label}</span>
+                          {imgUrl ? (
+                            <a href={imgUrl} target="_blank" rel="noreferrer" className="block relative h-16 w-full rounded-lg overflow-hidden border border-slate-100 group-hover:opacity-90 transition-all">
+                              <img src={imgUrl} alt={cat.label} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </a>
+                          ) : (
+                            <div className="h-16 w-full rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
+                              <Car size={20} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* TOP FEATURES & VEHICLE HIGHLIGHTS BADGES */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* TOP FEATURES */}
+                  <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-indigo-600" />
+                      <span>Top Features</span>
+                    </h4>
+                    {selectedPurchase.top_features && selectedPurchase.top_features.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {selectedPurchase.top_features.map((feat, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-100 flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 size={12} className="text-indigo-600" />
+                            <span>{feat}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No top features selected</p>
+                    )}
+                  </div>
+
+                  {/* VEHICLE HIGHLIGHTS */}
+                  <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-emerald-600" />
+                      <span>Vehicle Highlights</span>
+                    </h4>
+                    {selectedPurchase.vehicle_highlights && selectedPurchase.vehicle_highlights.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {selectedPurchase.vehicle_highlights.map((hl, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-100 flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 size={12} className="text-emerald-600" />
+                            <span>{hl}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {["Single Owner", "Insurance Valid", "Accident Free", "Finance Available", "RC Ready"].map((hl, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-100 flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 size={12} className="text-emerald-600" />
+                            <span>{hl}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {
     /* exactly 4 Document attachment view widgets */
   }
@@ -1529,11 +1988,11 @@ export default function PurchasesListAndForm({
                         <>
                           <div>
                             <span className="text-[10px] text-indigo-200 uppercase block">Total Vehicle Expenses</span>
-                            <span>₹{totalExpenses.toLocaleString("en-IN")}</span>
+                            <span>₹{(Number(totalExpenses) || 0).toLocaleString("en-IN")}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-indigo-200 uppercase block">Total Net Cost</span>
-                            <span className="text-yellow-200 font-extrabold">₹{totalCost.toLocaleString("en-IN")}</span>
+                            <span className="text-yellow-200 font-extrabold">₹{(Number(totalCost) || 0).toLocaleString("en-IN")}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-indigo-200 uppercase block">Execution Date</span>
@@ -1543,12 +2002,12 @@ export default function PurchasesListAndForm({
                             <>
                               <div>
                                 <span className="text-[10px] text-indigo-200 uppercase block">Offer Price</span>
-                                <span className="text-indigo-100 font-bold">₹{expectedSellingPrice.toLocaleString("en-IN")}</span>
+                                <span className="text-indigo-100 font-bold">₹{(Number(expectedSellingPrice) || 0).toLocaleString("en-IN")}</span>
                               </div>
                               <div>
                                 <span className="text-[10px] text-indigo-200 uppercase block">Potential Net Profit</span>
                                 <span className={potentialProfit >= 0 ? "text-emerald-300 font-extrabold" : "text-rose-300 font-extrabold"}>
-                                  ₹{potentialProfit.toLocaleString("en-IN")}
+                                  ₹{(Number(potentialProfit) || 0).toLocaleString("en-IN")}
                                 </span>
                               </div>
                             </>
@@ -1587,7 +2046,7 @@ export default function PurchasesListAndForm({
     /* ADD / EDIT TRANSACTION FORM OVERLAY */
   }
       <AnimatePresence>
-        {showAddEditModal && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        {showAddEditModal && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -1690,10 +2149,17 @@ export default function PurchasesListAndForm({
     onChange={(e) => handleSellerChange(e.target.value)}
     className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
   >
-                            <option value="">-- Choose Customer --</option>
-                            {customers.filter((c) => !c.isDeleted).map((c) => <option key={c.id} value={c.id}>
-                                {c.id} - {c.name}
-                              </option>)}
+                            <option value="">-- Choose Customer (Seller) --</option>
+                            {customers
+                              .filter((c) => !c.isDeleted && ((c.customer_type === "Sell" || c.requirement === "Sell" || (c.customer_type !== "Buy" && c.requirement !== "Buy")) || c.id === formState.seller_id))
+                              .map((c) => {
+                                const roleSuffix = (c.name || "").includes("(Seller)") ? "" : " (Seller)";
+                                return (
+                                  <option key={c.id} value={c.id}>
+                                    {c.id} - {c.name}{roleSuffix}
+                                  </option>
+                                );
+                              })}
                           </select>
                         </div> : <div className="space-y-1">
                           <label className="text-xs font-extrabold text-amber-800 uppercase tracking-widest">Supplier ID Dropdown</label>
@@ -1978,14 +2444,425 @@ export default function PurchasesListAndForm({
                       <div className="space-y-1">
                         <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Insurance Active?</label>
                         <select
-    value={formState.insurance_active}
-    onChange={(e) => setFormState((prev) => ({ ...prev, insurance_active: e.target.value }))}
-    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-  >
+                          value={formState.insurance_active}
+                          onChange={(e) => setFormState((prev) => ({ ...prev, insurance_active: e.target.value }))}
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        >
                           <option value="Yes">Yes</option>
                           <option value="No">No</option>
                         </select>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* OWNERSHIP TRANSFER STATUS SECTION */}
+                  <div className="space-y-4 bg-slate-50/70 p-4 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ArrowRightLeft className="text-indigo-600" size={18} />
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Ownership Transfer Status</h4>
+                      </div>
+                      <span className={cn(
+                        "px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border",
+                        formState.transfer_status === "Yes" ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"
+                      )}>
+                        {formState.transfer_status === "Yes" ? "Transferred" : "Pending Transfer"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Transfer Status</label>
+                        <select
+                          value={formState.transfer_status}
+                          onChange={(e) => setFormState((prev) => ({
+                            ...prev,
+                            transfer_status: e.target.value,
+                            transfer_date: e.target.value === "Yes" && !prev.transfer_date ? new Date().toISOString().split("T")[0] : prev.transfer_date
+                          }))}
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold"
+                        >
+                          <option value="No">No (Pending)</option>
+                          <option value="Yes">Yes (Transferred)</option>
+                        </select>
+                      </div>
+
+                      {formState.transfer_status === "Yes" && (
+                        <>
+                          <div className="space-y-1 animate-fadeIn">
+                            <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Transfer Date</label>
+                            <input
+                              type="date"
+                              value={formState.transfer_date || ""}
+                              onChange={(e) => setFormState((prev) => ({ ...prev, transfer_date: e.target.value }))}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono font-bold"
+                            />
+                          </div>
+
+                          <div className="space-y-1 animate-fadeIn">
+                            <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Transferred By</label>
+                            <input
+                              type="text"
+                              placeholder="RTO Agent / Staff Name"
+                              value={formState.transferred_by || ""}
+                              onChange={(e) => setFormState((prev) => ({ ...prev, transferred_by: e.target.value }))}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
+                            />
+                          </div>
+
+                          <div className="space-y-1 animate-fadeIn">
+                            <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Transfer Remarks</label>
+                            <input
+                              type="text"
+                              placeholder="Name transfer notes or application no."
+                              value={formState.transfer_remarks || ""}
+                              onChange={(e) => setFormState((prev) => ({ ...prev, transfer_remarks: e.target.value }))}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CATEGORY-WISE VEHICLE IMAGE MANAGEMENT */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Vehicle Image Management</h4>
+                        <p className="text-[11px] text-slate-400">Upload high-resolution category photos (Front, Back, Sides, Interior, Engine)</p>
+                      </div>
+
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold cursor-pointer transition-all border border-indigo-200 shrink-0">
+                        <Upload size={14} />
+                        <span>Multi-Image Batch Upload</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleMultiCategoryUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[
+                        { key: "front", title: "Front View", desc: "Main visual poster image" },
+                        { key: "back", title: "Back View", desc: "Rear registration & lights view" },
+                        { key: "left", title: "Left Side View", desc: "Full left profile view" },
+                        { key: "right", title: "Right Side View", desc: "Full right profile view" },
+                        { key: "interior", title: "Interior View", desc: "Dashboard & seating view" },
+                        { key: "engine", title: "Engine View", desc: "Engine bay / mechanical view" },
+                        { key: "meter", title: "Meter View", desc: "Odometer & cluster view" },
+                      ].map((cat) => {
+                        const imgUrl = formState.vehicle_images?.[cat.key];
+                        const progressKey = `category_${cat.key}`;
+                        const progress = uploadProgress[progressKey];
+
+                        return (
+                          <div
+                            key={cat.key}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) processCategoryUpload(file, cat.key);
+                            }}
+                            className="border border-slate-200 p-3.5 rounded-2xl bg-white shadow-sm flex flex-col justify-between space-y-2 hover:border-indigo-300 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-xs font-extrabold text-slate-800 block">{cat.title}</span>
+                                <span className="text-[10px] text-slate-400 block">{cat.desc}</span>
+                              </div>
+                              {imgUrl && (
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" title="Uploaded" />
+                              )}
+                            </div>
+
+                            {progress !== undefined ? (
+                              <div className="p-3 border border-indigo-100 bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center space-y-1.5 h-[120px]">
+                                <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Compressing & Uploading {progress}%</span>
+                                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-indigo-600 h-full transition-all duration-150" style={{ width: `${progress}%` }} />
+                                </div>
+                              </div>
+                            ) : imgUrl ? (
+                              <div className="relative h-[120px] bg-slate-900 rounded-xl overflow-hidden group shadow-inner">
+                                <img
+                                  src={imgUrl}
+                                  alt={cat.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => window.open(imgUrl, "_blank")}
+                                    className="p-1.5 bg-white/90 hover:bg-white text-slate-800 rounded-lg text-xs font-bold shadow transition-all"
+                                    title="Expand Image"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <label
+                                    className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow transition-all cursor-pointer"
+                                    title="Replace Image"
+                                  >
+                                    <Edit2 size={14} />
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                                      onChange={(e) => handleCategoryFileUpload(e, cat.key)}
+                                      className="hidden"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFormState((prev) => {
+                                      const nextImgs = { ...(prev.vehicle_images || {}), [cat.key]: "" };
+                                      const primary = nextImgs.front || nextImgs.back || nextImgs.left || nextImgs.right || nextImgs.interior || nextImgs.engine || "";
+                                      return { ...prev, vehicle_images: nextImgs, vehicle_image: primary };
+                                    })}
+                                    className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow transition-all"
+                                    title="Remove Image"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="border border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-3 text-center flex flex-col items-center justify-center h-[120px] bg-slate-50/50 hover:bg-indigo-50/20 transition-all group">
+                                <p className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-600 uppercase mb-2">Drag & Drop Image Here</p>
+                                <div className="flex items-center gap-2">
+                                  <label className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[11px] font-extrabold cursor-pointer transition-all shadow-sm flex items-center gap-1">
+                                    <Upload size={12} />
+                                    <span>Browse</span>
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                                      onChange={(e) => handleCategoryFileUpload(e, cat.key)}
+                                      className="hidden"
+                                    />
+                                  </label>
+                                  <label className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-extrabold cursor-pointer transition-all shadow-sm flex items-center gap-1">
+                                    <Camera size={12} />
+                                    <span>Camera</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      capture="environment"
+                                      onChange={(e) => handleCategoryFileUpload(e, cat.key)}
+                                      className="hidden"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* TOP FEATURES SELECTION FOR SALES POSTER & ADVERTISEMENTS */}
+                  <div className="space-y-4 border border-indigo-100 bg-indigo-50/20 p-5 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Sparkles size={16} className="text-indigo-600" />
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Top Vehicle Features (Showroom Poster Highlights)</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-500">Select key features to feature prominently on the Sales Poster & digital catalog</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold">
+                          {(formState.top_features || []).length} Selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormState((prev) => ({ ...prev, top_features: [...STANDARD_TOP_FEATURES] }))}
+                          className="px-2.5 py-1 bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormState((prev) => ({ ...prev, top_features: [] }))}
+                          className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-slate-200 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Standard Features Checkbox Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[260px] overflow-y-auto pr-1">
+                      {STANDARD_TOP_FEATURES.map((feat) => {
+                        const isChecked = (formState.top_features || []).includes(feat);
+                        return (
+                          <label
+                            key={feat}
+                            className={cn(
+                              "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-medium cursor-pointer transition-all select-none",
+                              isChecked
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setFormState((prev) => {
+                                  const list = prev.top_features || [];
+                                  if (list.includes(feat)) {
+                                    return { ...prev, top_features: list.filter((f) => f !== feat) };
+                                  } else {
+                                    return { ...prev, top_features: [...list, feat] };
+                                  }
+                                });
+                              }}
+                              className="hidden"
+                            />
+                            <div className={cn(
+                              "w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-all",
+                              isChecked ? "bg-white border-white text-indigo-600" : "border-slate-300 bg-slate-50"
+                            )}>
+                              {isChecked && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <span className="truncate">{feat}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Feature Add Input */}
+                    <div className="pt-2 border-t border-indigo-100 flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add custom feature (e.g. Ventilated Seats, 360 Camera)..."
+                        value={customFeatureInput}
+                        onChange={(e) => setCustomFeatureInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddCustomFeature();
+                          }
+                        }}
+                        className="flex-1 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomFeature}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus size={14} />
+                        <span>Add Feature</span>
+                      </button>
+                    </div>
+
+                    {/* Additional/Custom Selected Features Tags */}
+                    {(formState.top_features || []).filter((f) => !STANDARD_TOP_FEATURES.includes(f)).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        <span className="text-[11px] font-bold text-slate-500 self-center mr-1">Custom:</span>
+                        {(formState.top_features || []).filter((f) => !STANDARD_TOP_FEATURES.includes(f)).map((customFeat) => (
+                          <span
+                            key={customFeat}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-bold"
+                          >
+                            {customFeat}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormState((prev) => ({
+                                  ...prev,
+                                  top_features: (prev.top_features || []).filter((f) => f !== customFeat)
+                                }));
+                              }}
+                              className="hover:text-rose-600 ml-0.5 cursor-pointer"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VEHICLE HIGHLIGHTS SELECTION FOR SHOWROOM POSTER */}
+                  <div className="space-y-4 border border-amber-200 bg-amber-50/30 p-5 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Award size={16} className="text-amber-600" />
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Vehicle Commercial Highlights</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-500">Select key commercial badges for the showroom advertisement poster & WhatsApp catalog</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-bold">
+                          {(formState.vehicle_highlights || []).length} Selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormState((prev) => ({ ...prev, vehicle_highlights: [...STANDARD_HIGHLIGHTS] }))}
+                          className="px-2.5 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormState((prev) => ({ ...prev, vehicle_highlights: [] }))}
+                          className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-slate-200 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Standard Highlights Checkbox Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                      {STANDARD_HIGHLIGHTS.map((hl) => {
+                        const isChecked = (formState.vehicle_highlights || []).includes(hl);
+                        return (
+                          <label
+                            key={hl}
+                            className={cn(
+                              "flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all select-none",
+                              isChecked
+                                ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setFormState((prev) => {
+                                  const list = prev.vehicle_highlights || [];
+                                  if (list.includes(hl)) {
+                                    return { ...prev, vehicle_highlights: list.filter((h) => h !== hl) };
+                                  } else {
+                                    return { ...prev, vehicle_highlights: [...list, hl] };
+                                  }
+                                });
+                              }}
+                              className="hidden"
+                            />
+                            <div className={cn(
+                              "w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-all",
+                              isChecked ? "bg-slate-950 border-slate-950 text-amber-400" : "border-slate-300 bg-slate-50"
+                            )}>
+                              {isChecked && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <span className="truncate">{hl}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -2241,7 +3118,7 @@ export default function PurchasesListAndForm({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Offer Price (₹)</label>
+                        <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Sales Price (₹)</label>
                         <input
     type="number"
     value={formState.expected_selling_price || ""}
@@ -2316,7 +3193,7 @@ export default function PurchasesListAndForm({
     /* Vehicle Loan Management Modal */
   }
       <AnimatePresence>
-        {showLoanModal && activeLoanPurchase && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {showLoanModal && activeLoanPurchase && <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
             <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -2504,532 +3381,13 @@ export default function PurchasesListAndForm({
           </div>}
       </AnimatePresence>
 
-      {
-    /* WhatsApp Share Card Modal (Requirement 11 - Vehicle Sharing) */
-  }
-      <AnimatePresence>
-        {vehicleToShare && (() => {
-    const totalExpenses = (Number(vehicleToShare.fuel_expense) || 0) + (Number(vehicleToShare.repair_expense) || 0) + (Number(vehicleToShare.service_expense) || 0) + (Number(vehicleToShare.insurance_expense) || 0) + (Number(vehicleToShare.rto_expense) || 0) + (Number(vehicleToShare.other_expense) || 0);
-    const computedSellingPrice = (Number(vehicleToShare.purchase_price) || 0) + (Number(vehicleToShare.consultancy_fees) || 0) + totalExpenses;
-    const expectedPrice = Number(vehicleToShare.expected_selling_price) || computedSellingPrice;
-
-    const companyName = businessProfile?.companyName || "Auto360 Consultancy";
-    const companyMobile = businessProfile?.mobileNumber || "N/A";
-    const whatsappNum = businessProfile?.whatsAppNumber || "N/A";
-    const companyAddress = businessProfile?.address ? `${businessProfile.address}, ${businessProfile.city || ""}, ${businessProfile.state || ""} - ${businessProfile.pincode || ""}` : "Coimbatore, Tamil Nadu";
-    const companyWebsite = businessProfile?.website || "www.auto360.com";
-    const gstText = businessProfile?.gstNumber ? `📄 *GST:* ${businessProfile.gstNumber}\n` : "";
-
-    const whatsappMsg = `*VEHICLE QUOTATION - ${companyName.toUpperCase()}*
-=========================================
-📞 *Contact:* ${companyMobile}
-💬 *WhatsApp:* ${whatsappNum}
-🌐 *Website:* ${companyWebsite}
-📍 *Address:* ${companyAddress}
-${gstText}=========================================
-
-🚗 *Vehicle details:*
-*Brand:* ${vehicleToShare.brand_id}
-*Model:* ${vehicleToShare.vehicle_name_id}
-*Variant:* ${vehicleToShare.model_details || "N/A"}
-*Year:* ${vehicleToShare.year}
-*Fuel:* ${vehicleToShare.fuel_type}
-*KM Driven:* ${vehicleToShare.kms_driven ? Number(vehicleToShare.kms_driven).toLocaleString("en-IN") : "45,000"} KM
-*Reg Number:* ${vehicleToShare.reg_no || "N/A"}
-
-💰 *Expected Offer Price:* ₹${expectedPrice.toLocaleString("en-IN")}
-
-Generated via ${companyName}.`;
-
-    // Canvas poster generation function
-    const handleSaveAsImage = async () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1000;
-      canvas.height = 1350;
-      const ctx = canvas.getContext("2d");
-      
-      // Gradient background
-      const grad = ctx.createLinearGradient(0, 0, 0, 1350);
-      grad.addColorStop(0, "#0f172a");
-      grad.addColorStop(1, "#1e293b");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 1000, 1350);
-
-      // Gold border
-      ctx.strokeStyle = "#e2e8f0";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(30, 30, 940, 1290);
-
-      // Company header
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 44px Helvetica";
-      ctx.textAlign = "center";
-      ctx.fillText(companyName.toUpperCase(), 500, 100);
-
-      ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 20px Helvetica";
-      ctx.fillText("PREMIUM AUTOMOBILE FOR SALE", 500, 145);
-
-      // Draw Hero Area
-      ctx.fillStyle = "#1e293b";
-      ctx.fillRect(80, 180, 840, 420);
-
-      const drawVehicleImage = () => {
-        return new Promise((resolve) => {
-          if (vehicleToShare.vehicle_image) {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.src = vehicleToShare.vehicle_image;
-            img.onload = () => {
-              ctx.drawImage(img, 80, 180, 840, 420);
-              resolve();
-            };
-            img.onerror = () => {
-              drawCarPlaceholder();
-              resolve();
-            };
-          } else {
-            drawCarPlaceholder();
-            resolve();
-          }
-        });
-      };
-
-      const drawCarPlaceholder = () => {
-        ctx.fillStyle = "#334155";
-        ctx.fillRect(80, 180, 840, 420);
-        ctx.fillStyle = "#64748b";
-        ctx.font = "110px Helvetica";
-        ctx.fillText("🚗", 500, 390);
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = "bold 24px Helvetica";
-        ctx.fillText("Auto360 Premium Verified Vehicle", 500, 460);
-      };
-
-      await drawVehicleImage();
-
-      // Brand and Model name
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 46px Helvetica";
-      ctx.textAlign = "center";
-      ctx.fillText(`${vehicleToShare.brand_id} ${vehicleToShare.vehicle_name_id}`, 500, 665);
-
-      // Price Tag
-      ctx.fillStyle = "#facc15";
-      ctx.font = "bold 52px Helvetica";
-      ctx.fillText(`Expected Price: ₹${expectedPrice.toLocaleString("en-IN")}/-`, 500, 745);
-
-      // Grid stats box
-      ctx.fillStyle = "#1e293b";
-      ctx.fillRect(80, 790, 840, 240);
-
-      ctx.strokeStyle = "#475569";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(500, 790);
-      ctx.lineTo(500, 1030);
-      ctx.moveTo(80, 910);
-      ctx.lineTo(920, 910);
-      ctx.stroke();
-
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 18px Helvetica";
-      
-      // Stat 1: Year
-      ctx.fillText("MANUFACTURING YEAR", 120, 830);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px Helvetica";
-      ctx.fillText(String(vehicleToShare.year), 120, 875);
-
-      // Stat 2: Fuel
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 18px Helvetica";
-      ctx.fillText("FUEL TYPE", 540, 830);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px Helvetica";
-      ctx.fillText(vehicleToShare.fuel_type, 540, 875);
-
-      // Stat 3: KM driven
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 18px Helvetica";
-      ctx.fillText("KM DRIVEN", 120, 950);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px Helvetica";
-      const kmsText = vehicleToShare.kms_driven ? `${Number(vehicleToShare.kms_driven).toLocaleString("en-IN")} KM` : "45,000 KM";
-      ctx.fillText(kmsText, 120, 995);
-
-      // Stat 4: Reg Number
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 18px Helvetica";
-      ctx.fillText("REGISTRATION NUMBER", 540, 950);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px Helvetica font-mono";
-      ctx.fillText(vehicleToShare.reg_no || "N/A", 540, 995);
-
-      // Contact details row
-      ctx.fillStyle = "#0f172a";
-      ctx.fillRect(80, 1060, 840, 215);
-
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 22px Helvetica";
-      ctx.fillText(companyName, 120, 1105);
-
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = "18px Helvetica";
-      ctx.fillText(`📞 Mobile: ${companyMobile}`, 120, 1145);
-      ctx.fillText(`💬 WhatsApp: ${whatsappNum}`, 120, 1180);
-      ctx.fillText(`🌐 Website: ${companyWebsite}`, 120, 1215);
-      if (businessProfile?.gstNumber) {
-        ctx.fillText(`📄 GST ID: ${businessProfile.gstNumber}`, 120, 1245);
-      }
-
-      // Draw UPI scan to pay QR
-      const upiId = businessProfile?.upiId;
-      if (upiId) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('upi://pay?pa=' + upiId + '&pn=' + encodeURIComponent(companyName) + '&am=' + expectedPrice + '&cu=INR')}`;
-        const qrImg = new Image();
-        qrImg.crossOrigin = "anonymous";
-        qrImg.src = qrUrl;
-        await new Promise((resolve) => {
-          qrImg.onload = () => {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(720, 1080, 180, 180);
-            ctx.drawImage(qrImg, 725, 1085, 170, 170);
-            resolve();
-          };
-          qrImg.onerror = () => resolve();
-        });
-      }
-
-      const dataUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.download = `Poster_${vehicleToShare.brand_id}_${vehicleToShare.vehicle_name_id}.png`;
-      link.href = dataUrl;
-      link.click();
-    };
-
-    // PDF poster generation function
-    const handleSaveAsPDF = async () => {
-      const doc = new jsPDF("p", "mm", "a4");
-      
-      doc.setDrawColor(15, 23, 42);
-      doc.setLineWidth(1);
-      doc.rect(5, 5, 200, 287);
-
-      // Dark header bar
-      doc.setFillColor(15, 23, 42);
-      doc.rect(6, 6, 198, 42, "F");
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont("Helvetica", "bold");
-      doc.text(companyName.toUpperCase(), 105, 20, { align: "center" });
-
-      doc.setFontSize(11);
-      doc.setFont("Helvetica", "normal");
-      doc.setTextColor(56, 189, 248);
-      doc.text("PREMIUM AUTOMOBILE FOR SALE", 105, 28, { align: "center" });
-
-      if (companyWebsite) {
-        doc.setFontSize(8.5);
-        doc.setTextColor(148, 163, 184);
-        doc.text(companyWebsite, 105, 34, { align: "center" });
-      }
-
-      let imgY = 54;
-      let imgH = 80;
-
-      const drawPDFImagePlaceholder = () => {
-        doc.setFillColor(241, 245, 249);
-        doc.rect(15, imgY, 180, imgH, "F");
-        doc.setFontSize(14);
-        doc.setTextColor(148, 163, 184);
-        doc.setFont("Helvetica", "bold");
-        doc.text("AUTO360", 105, imgY + (imgH / 2) - 2, { align: "center" });
-        doc.setFontSize(9);
-        doc.setFont("Helvetica", "normal");
-        doc.text("Premium Automobile Advertisement", 105, imgY + (imgH / 2) + 6, { align: "center" });
-      };
-
-      if (vehicleToShare.vehicle_image) {
-        try {
-          const imgData = await loadImageBase64(vehicleToShare.vehicle_image);
-          if (imgData) {
-            doc.addImage(imgData, "JPEG", 15, imgY, 180, imgH);
-          } else {
-            drawPDFImagePlaceholder();
-          }
-        } catch (e) {
-          drawPDFImagePlaceholder();
-        }
-      } else {
-        drawPDFImagePlaceholder();
-      }
-
-      doc.setFontSize(18);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(`${vehicleToShare.brand_id} ${vehicleToShare.vehicle_name_id}`, 15, imgY + imgH + 12);
-
-      doc.setFontSize(20);
-      doc.setTextColor(16, 185, 129);
-      doc.text(`Price: INR ${expectedPrice.toLocaleString("en-IN")}/-`, 195, imgY + imgH + 12, { align: "right" });
-
-      // Grid Details
-      const gridY = imgY + imgH + 20;
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(248, 250, 252);
-      doc.rect(15, gridY, 180, 48, "FD");
-
-      doc.line(105, gridY, 105, gridY + 48);
-      doc.line(15, gridY + 24, 195, gridY + 24);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("Helvetica", "normal");
-      
-      // Grid cells
-      doc.text("MANUFACTURING YEAR", 20, gridY + 8);
-      doc.setFontSize(13);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(String(vehicleToShare.year), 20, gridY + 16);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("Helvetica", "normal");
-      doc.text("FUEL TYPE", 110, gridY + 8);
-      doc.setFontSize(13);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(vehicleToShare.fuel_type, 110, gridY + 16);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("Helvetica", "normal");
-      doc.text("KM DRIVEN", 20, gridY + 32);
-      doc.setFontSize(13);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      const kmsText = vehicleToShare.kms_driven ? `${Number(vehicleToShare.kms_driven).toLocaleString("en-IN")} KM` : "45,000 KM";
-      doc.text(kmsText, 20, gridY + 40);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("Helvetica", "normal");
-      doc.text("REGISTRATION NUMBER", 110, gridY + 32);
-      doc.setFontSize(13);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(vehicleToShare.reg_no || "N/A", 110, gridY + 40);
-
-      // Contact details block
-      const footY = gridY + 60;
-      doc.setFillColor(241, 245, 249);
-      doc.rect(15, footY, 180, 42, "F");
-
-      doc.setFontSize(11);
-      doc.setFont("Helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(companyName, 20, footY + 10);
-
-      doc.setFontSize(8.5);
-      doc.setFont("Helvetica", "normal");
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Phone Contact: ${companyMobile}`, 20, footY + 17);
-      doc.text(`WhatsApp: ${whatsappNum}`, 20, footY + 23);
-      doc.text(`Website URL: ${companyWebsite}`, 20, footY + 29);
-      doc.text(`Address: ${companyAddress}`, 20, footY + 35);
-
-      // UPI QR Code on PDF
-      const upiId = businessProfile?.upiId;
-      if (upiId) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('upi://pay?pa=' + upiId + '&pn=' + encodeURIComponent(companyName) + '&am=' + expectedPrice + '&cu=INR')}`;
-        try {
-          const qrData = await loadImageBase64(qrUrl);
-          if (qrData) {
-            doc.addImage(qrData, "JPEG", 155, footY + 5, 32, 32);
-          }
-        } catch (e) {
-          console.warn("QR load failed for PDF", e);
-        }
-      }
-
-      doc.save(`Poster_${vehicleToShare.brand_id}_${vehicleToShare.vehicle_name_id}.pdf`);
-    };
-
-    const loadImageBase64 = (url) => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = url;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/jpeg"));
-        };
-        img.onerror = () => resolve(null);
-      });
-    };
-
-    const upiId = businessProfile?.upiId;
-    const upiQrSrc = upiId ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('upi://pay?pa=' + upiId + '&pn=' + encodeURIComponent(companyName) + '&am=' + expectedPrice + '&cu=INR')}` : null;
-
-    return <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setVehicleToShare(null)}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 z-10 flex flex-col md:flex-row max-h-[90vh]"
-              >
-                {/* Left Side: Real-time visual poster preview */}
-                <div className="flex-1 bg-slate-900 p-6 overflow-y-auto flex items-center justify-center border-b md:border-b-0 md:border-r border-slate-800">
-                  <div className="w-full max-w-[360px] aspect-[10/14.5] bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden text-left text-white select-none">
-                    {/* Header banner */}
-                    <div className="p-4 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] uppercase font-extrabold tracking-widest text-brand-400">{companyName}</p>
-                        <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">PREMIUM SELECTION</h5>
-                      </div>
-                      <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase">FOR SALE</span>
-                    </div>
-
-                    {/* Hero Photo placeholder */}
-                    <div className="h-44 bg-slate-900 relative flex items-center justify-center overflow-hidden border-b border-slate-800">
-                      {vehicleToShare.vehicle_image ? (
-                        <img
-                          src={vehicleToShare.vehicle_image}
-                          alt="Vehicle"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center text-slate-500 space-y-1">
-                          <Car size={40} className="text-brand-500 stroke-[1.5]" />
-                          <span className="text-xs">Auto360 Verified</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content body */}
-                    <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                      <div>
-                        <h4 className="font-extrabold text-white text-lg tracking-tight">{vehicleToShare.brand_id} {vehicleToShare.vehicle_name_id}</h4>
-                        <p className="text-xs text-slate-400 font-bold uppercase">{vehicleToShare.model_details || "N/A"}</p>
-                      </div>
-
-                      {/* Info grid */}
-                      <div className="grid grid-cols-2 gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800/60 text-xs">
-                        <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase block">Year</span>
-                          <span className="font-bold text-slate-200">{vehicleToShare.year}</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase block">Fuel Type</span>
-                          <span className="font-bold text-slate-200">{vehicleToShare.fuel_type}</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase block">KM Driven</span>
-                          <span className="font-bold text-slate-200">{vehicleToShare.kms_driven ? `${Number(vehicleToShare.kms_driven).toLocaleString("en-IN")} KM` : "45,000 KM"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase block">Reg No</span>
-                          <span className="font-bold text-slate-200 font-mono">{vehicleToShare.reg_no || "N/A"}</span>
-                        </div>
-                      </div>
-
-                      {/* Price banner */}
-                      <div className="bg-brand-500/5 border border-brand-500/20 rounded-xl p-3 text-center">
-                        <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">EXPECTED OFFER PRICE</span>
-                        <span className="text-xl font-black text-brand-400">₹{expectedPrice.toLocaleString("en-IN")}/-</span>
-                      </div>
-
-                      {/* Contact row and dynamic UPI QR */}
-                      <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 text-[10px] text-slate-400">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-slate-300">{companyName}</p>
-                          <p>📞 {companyMobile}</p>
-                          <p>🌐 {companyWebsite}</p>
-                        </div>
-                        {upiQrSrc && (
-                          <div className="w-12 h-12 bg-white rounded p-0.5 flex items-center justify-center">
-                            <img src={upiQrSrc} alt="UPI QR" className="w-full h-full object-contain" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Options and buttons panel */}
-                <div className="w-full md:w-[320px] p-6 flex flex-col justify-between max-h-[90vh]">
-                  <div className="space-y-5 text-left">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-lg font-bold text-slate-900">Share Vehicle</h4>
-                        <p className="text-xs text-slate-500">Choose your preferred sharing mode</p>
-                      </div>
-                      <button onClick={() => setVehicleToShare(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-                        <X size={18} />
-                      </button>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      <button
-                        onClick={handleSaveAsImage}
-                        className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 transition-all uppercase tracking-wider cursor-pointer border-0 outline-none"
-                      >
-                        <Download size={14} />
-                        <span>Save Poster as Image</span>
-                      </button>
-
-                      <button
-                        onClick={handleSaveAsPDF}
-                        className="w-full px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-rose-100 transition-all uppercase tracking-wider cursor-pointer border-0 outline-none"
-                      >
-                        <FileDown size={14} />
-                        <span>Save as PDF Poster</span>
-                      </button>
-
-                      <div className="relative flex py-2 items-center">
-                        <div className="flex-grow border-t border-slate-200"></div>
-                        <span className="flex-shrink mx-3 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Or Share Direct</span>
-                        <div className="flex-grow border-t border-slate-200"></div>
-                      </div>
-
-                      <a
-                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all uppercase tracking-wider text-center border-0 outline-none"
-                      >
-                        <Share2 size={14} />
-                        <span>Direct WhatsApp Share</span>
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 text-left mt-6">
-                    <p className="font-bold text-slate-800 mb-1">💡 Pro-Tip</p>
-                    <p className="leading-relaxed">All company details are dynamically populated from your <b>Company Master</b> settings for real-time brand professionalism.</p>
-                  </div>
-                </div>
-              </motion.div>
-            </div>;
-  })()}
-      </AnimatePresence>
+      {/* SALES POSTER & COMMERCIAL ADVERTISEMENT MODAL */}
+      <SalesPosterModal
+        vehicle={vehicleToShare}
+        businessProfile={businessProfile}
+        isOpen={!!vehicleToShare}
+        onClose={() => setVehicleToShare(null)}
+      />
 
     </div>;
 }

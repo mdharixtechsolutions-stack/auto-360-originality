@@ -12,12 +12,16 @@ import {
   Eye,
   Phone,
   X,
-  ChevronLeft
+  ChevronLeft,
+  Building2,
+  Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
+import { calculateSupplierTotalStats } from "../lib/outstandingCalculator";
 import { hasModulePermission } from "../lib/permissions";
+import { INDIAN_STATES } from "../data/indianStates";
 export default function Masters({
   brands,
   vehicleNames,
@@ -26,6 +30,9 @@ export default function Masters({
   subAreas: propSubAreas,
   suppliers: propSuppliers,
   customers,
+  purchases = [],
+  payments = [],
+  vouchers = [],
   onUpdateBrands,
   onUpdateVehicleNames,
   onUpdateCities,
@@ -89,14 +96,24 @@ export default function Masters({
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchSearch, setBranchSearch] = useState("");
   const [brId, setBrId] = useState("");
+  const [brCode, setBrCode] = useState("");
   const [brName, setBrName] = useState("");
+  const [brPhone, setBrPhone] = useState("");
   const [brMobile, setBrMobile] = useState("");
   const [brEmail, setBrEmail] = useState("");
   const [brAddress, setBrAddress] = useState("");
   const [brCity, setBrCity] = useState("");
+  const [brState, setBrState] = useState("");
+  const [brPincode, setBrPincode] = useState("");
   const [brArea, setBrArea] = useState("");
   const [brSubArea, setBrSubArea] = useState("");
+  const [brGstNo, setBrGstNo] = useState("");
+  const [brManagerName, setBrManagerName] = useState("");
+  const [brLogo, setBrLogo] = useState("");
   const [brStatus, setBrStatus] = useState("Active");
+  const [isUploadingBrLogo, setIsUploadingBrLogo] = useState(false);
+  const [showBranchViewModal, setShowBranchViewModal] = useState(false);
+  const [viewingBranch, setViewingBranch] = useState(null);
   const [dbSuppliers, setDbSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [supSearch, setSupSearch] = useState("");
@@ -120,8 +137,23 @@ export default function Masters({
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState(null);
   useEffect(() => {
-    fetchCitiesList();
-  }, []);
+    fetchAllLocationData();
+  }, [propCities, propAreas, propSubAreas]);
+
+  const fetchAllLocationData = async () => {
+    try {
+      const [cData, aData, saData] = await Promise.all([
+        safeFetchJson("/api/cities"),
+        safeFetchJson("/api/areas"),
+        safeFetchJson("/api/subareas")
+      ]);
+      setCitiesList(cData || []);
+      setAreasList(aData || []);
+      setSubAreasList(saData || []);
+    } catch (e) {
+      console.warn("Error fetching location data:", e);
+    }
+  };
   useEffect(() => {
     if (activeSubTab === "suppliers") {
       fetchSuppliers();
@@ -147,27 +179,33 @@ export default function Masters({
     try {
       const data = await safeFetchJson("/api/branches/nextId");
       setBrId(data.nextId);
+      setBrCode(data.nextId);
     } catch (e) {
       setBrId("BR001");
+      setBrCode("BR001");
     }
   };
-  useEffect(() => {
-    if (supCityId) {
-      fetchAreasForSupplier(supCityId);
-    } else {
-      setAreasList([]);
-      setSupAreaId("");
-      setSupSubAreaId("");
+
+  const handleBranchLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingBrLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      if (data.filePath) {
+        setBrLogo(data.filePath);
+      }
+    } catch (err) {
+      console.error(err);
+      setGeneralError("Failed to upload branch logo");
+    } finally {
+      setIsUploadingBrLogo(false);
     }
-  }, [supCityId]);
-  useEffect(() => {
-    if (supAreaId) {
-      fetchSubAreasForSupplier(supAreaId);
-    } else {
-      setSubAreasList([]);
-      setSupSubAreaId("");
-    }
-  }, [supAreaId]);
+  };
   const safeFetchJson = async (url, options) => {
     const res = await fetch(url, options);
     if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
@@ -176,30 +214,6 @@ export default function Masters({
       throw new Error(`Expected JSON response, but received: ${contentType || "none"}`);
     }
     return res.json();
-  };
-  const fetchCitiesList = async () => {
-    try {
-      const data = await safeFetchJson("/api/cities");
-      setCitiesList(data);
-    } catch (e) {
-      console.warn("Error fetching cities graceful-catch:", e);
-    }
-  };
-  const fetchAreasForSupplier = async (cityId) => {
-    try {
-      const data = await safeFetchJson(`/api/areas?cityId=${cityId}`);
-      setAreasList(data);
-    } catch (e) {
-      console.warn("Error fetching areas graceful-catch:", e);
-    }
-  };
-  const fetchSubAreasForSupplier = async (areaId) => {
-    try {
-      const data = await safeFetchJson(`/api/subareas?areaId=${areaId}`);
-      setSubAreasList(data);
-    } catch (e) {
-      console.warn("Error fetching sub-areas graceful-catch:", e);
-    }
   };
   const fetchSuppliers = async () => {
     setSuppliersLoading(true);
@@ -243,12 +257,18 @@ export default function Masters({
       setGeneralError(null);
       await fetchNextBranchId();
       setBrName("");
+      setBrPhone("");
       setBrMobile("");
       setBrEmail("");
       setBrAddress("");
       setBrCity("");
+      setBrState("Tamil Nadu");
+      setBrPincode("");
       setBrArea("");
       setBrSubArea("");
+      setBrGstNo("");
+      setBrManagerName("");
+      setBrLogo("");
       setBrStatus("Active");
       setEditingItem(null);
       setShowModal(true);
@@ -276,13 +296,7 @@ export default function Masters({
       setSupName(item.supplier_name);
       setSupMobile(item.supplier_mobile);
       setSupCityId(item.city_id || "");
-      if (item.city_id) {
-        await fetchAreasForSupplier(item.city_id);
-      }
       setSupAreaId(item.area_id || "");
-      if (item.area_id) {
-        await fetchSubAreasForSupplier(item.area_id);
-      }
       setSupSubAreaId(item.sub_area_id || "");
       setSupAddress(item.address || "");
       setShowModal(true);
@@ -291,13 +305,20 @@ export default function Masters({
       setFormErrors({});
       setGeneralError(null);
       setBrId(item.id);
+      setBrCode(item.code || item.id);
       setBrName(item.name || "");
+      setBrPhone(item.phone || "");
       setBrMobile(item.mobile || "");
       setBrEmail(item.email || "");
       setBrAddress(item.address || "");
       setBrCity(item.city || "");
+      setBrState(item.state || "Tamil Nadu");
+      setBrPincode(item.pincode || "");
       setBrArea(item.area || "");
       setBrSubArea(item.subArea || "");
+      setBrGstNo(item.gstNo || "");
+      setBrManagerName(item.managerName || "");
+      setBrLogo(item.logo || "");
       setBrStatus(item.status || "Active");
       setShowModal(true);
     } else {
@@ -445,22 +466,39 @@ export default function Masters({
     } else if (activeSubTab === "branches") {
       const errors = {};
       if (!brName.trim()) errors.name = "Branch Name is required";
+      if (!brCode.trim()) errors.code = "Branch Code is required";
       if (!brMobile.trim()) errors.mobile = "Mobile Number is required";
       else if (!/^\d{10}$/.test(brMobile)) errors.mobile = "Mobile number must be exactly 10 digits";
       if (!brEmail.trim()) errors.email = "Email Address is required";
       if (!brAddress.trim()) errors.address = "Branch Address is required";
+
+      // Duplicate validations
+      const currentEditingId = editingItem ? editingItem.id : null;
+      const dupName = dbBranches.find(b => b.id !== currentEditingId && b.name.toLowerCase().trim() === brName.toLowerCase().trim());
+      if (dupName) errors.name = "Duplicate Branch Name: Branch name already exists";
+
+      const dupCode = dbBranches.find(b => b.id !== currentEditingId && ((b.code && b.code.toLowerCase().trim() === brCode.toLowerCase().trim()) || b.id.toLowerCase().trim() === brCode.toLowerCase().trim()));
+      if (dupCode) errors.code = "Duplicate Branch Code: Branch code already exists";
+
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         return;
       }
       const payload = {
+        code: brCode,
         name: brName,
+        phone: brPhone,
         mobile: brMobile,
         email: brEmail,
         address: brAddress,
         city: brCity,
+        state: brState,
+        pincode: brPincode,
         area: brArea,
         subArea: brSubArea,
+        gstNo: brGstNo,
+        managerName: brManagerName,
+        logo: brLogo,
         status: brStatus
       };
       try {
@@ -784,8 +822,13 @@ export default function Masters({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {dbSuppliers.map((s) => {
-    const city = citiesList.find((c) => c.id === s.city_id)?.name || "";
-    return <tr key={s.supplier_id} className="hover:bg-slate-50/25 group transition-colors">
+                          const city = citiesList.find((c) => c.id === s.city_id)?.name || "";
+                          const area = areasList.find((a) => a.id === s.area_id)?.name || "";
+                          const subArea = subAreasList.find((sa) => sa.id === s.sub_area_id)?.name || "";
+                          const locParts = [city, area, subArea].filter(Boolean);
+                          const locText = locParts.length > 0 ? locParts.join(" • ") : "No location linked";
+                          return (
+                            <tr key={s.supplier_id} className="hover:bg-slate-50/25 group transition-colors">
                               <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">{s.supplier_id}</td>
                               <td className="px-6 py-4">
                                 <p className="text-sm font-bold text-slate-900 leading-snug">{s.supplier_name}</p>
@@ -795,22 +838,23 @@ export default function Masters({
                                 </p>
                               </td>
                               <td className="px-6 py-4">
-                                <p className="text-xs text-slate-700 font-semibold">{city || "No city linked"}</p>
-                                {s.address && <p className="text-[11px] text-slate-400 font-medium truncate max-w-[200px]">{s.address}</p>}
+                                <p className="text-xs text-slate-700 font-bold">{locText}</p>
+                                {s.address && <p className="text-[11px] text-slate-400 font-medium truncate max-w-[220px]">{s.address}</p>}
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleOpenViewDetails(s)} className="p-2 text-slate-400 hover:text-brand-600 rounded-lg cursor-pointer outline-none" title="View details"><Eye size={15} /></button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => handleOpenViewDetails(s)} className="p-2 text-slate-500 hover:text-brand-600 bg-slate-100/60 hover:bg-brand-50 rounded-lg cursor-pointer transition-colors" title="View details"><Eye size={15} /></button>
                                   {hasModulePermission(currentUser, "masters", "edit") && (
-                                    <button onClick={() => handleEdit(s)} className="p-2 text-slate-400 hover:text-brand-600 rounded-lg cursor-pointer outline-none" title="Edit"><Edit2 size={15} /></button>
+                                    <button onClick={() => handleEdit(s)} className="p-2 text-slate-500 hover:text-brand-600 bg-slate-100/60 hover:bg-brand-50 rounded-lg cursor-pointer transition-colors" title="Edit"><Edit2 size={15} /></button>
                                   )}
                                   {hasModulePermission(currentUser, "masters", "delete") && (
-                                    <button onClick={() => handleDelete(s.supplier_id, s.supplier_name)} className="p-2 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer outline-none" title="Delete"><Trash2 size={15} /></button>
+                                    <button onClick={() => handleDelete(s.supplier_id, s.supplier_name)} className="p-2 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg cursor-pointer transition-colors" title="Delete"><Trash2 size={15} /></button>
                                   )}
                                 </div>
                               </td>
-                            </tr>;
-  })}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table> : <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                       <Users size={48} className="mb-4 opacity-20" />
@@ -904,65 +948,100 @@ export default function Masters({
                     </div> : dbBranches.length > 0 ? <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50/75 border-b border-slate-200">
-                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">ID</th>
-                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Branch Name</th>
+                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Code</th>
+                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Branch Name & Manager</th>
                           <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Contact Details</th>
-                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Location Details</th>
+                          <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Location & State</th>
                           <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase font-sans">Status</th>
                           <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase text-right font-sans">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {dbBranches.filter((b) => {
-    const s = branchSearch.toLowerCase();
-    return b.id.toLowerCase().includes(s) || b.name.toLowerCase().includes(s) || (b.city || "").toLowerCase().includes(s) || (b.mobile || "").toLowerCase().includes(s) || (b.email || "").toLowerCase().includes(s) || (b.address || "").toLowerCase().includes(s);
-  }).map((b) => <tr key={b.id} className="hover:bg-slate-50/25 group transition-colors">
-                              <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">{b.id}</td>
-                              <td className="px-6 py-4">
-                                <p className="text-sm font-bold text-slate-900 leading-snug">{b.name}</p>
-                                <p className="text-xs text-slate-450 mt-0.5 leading-normal">{b.address}</p>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <p className="text-xs text-slate-800 font-semibold">{b.mobile}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">{b.email}</p>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md">{b.city}</span>
-                                {b.area && <span className="text-xs font-medium text-slate-500 ml-1.5">{b.area}</span>}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={cn(
-    "text-[10px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full",
-    b.status === "Active" ? "bg-emerald-550/10 text-emerald-600" : "bg-red-550/10 text-red-600"
-  )}>
-                                  {b.status}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {isSoftwareOwner && hasModulePermission(currentUser, "masters", "edit") && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleEdit(b)}
-                                      className="p-1.5 text-slate-450 hover:bg-slate-100 hover:text-brand-650 rounded-lg transition-all cursor-pointer outline-none"
-                                      title="Edit Branch"
-                                    >
-                                      <Edit2 size={14} />
-                                    </button>
-                                  )}
-                                  {isSoftwareOwner && hasModulePermission(currentUser, "masters", "delete") && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDelete(b.id)}
-                                      className="p-1.5 text-slate-450 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all cursor-pointer outline-none"
-                                      title="Delete Branch"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>)}
+                          const s = branchSearch.toLowerCase();
+                          return (b.code || b.id).toLowerCase().includes(s) || 
+                            b.name.toLowerCase().includes(s) || 
+                            (b.managerName || "").toLowerCase().includes(s) || 
+                            (b.city || "").toLowerCase().includes(s) || 
+                            (b.state || "").toLowerCase().includes(s) || 
+                            (b.mobile || "").toLowerCase().includes(s) || 
+                            (b.email || "").toLowerCase().includes(s) || 
+                            (b.address || "").toLowerCase().includes(s);
+                        }).map((b) => (
+                          <tr key={b.id} className="hover:bg-slate-50/25 group transition-colors">
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">
+                              <div className="flex items-center gap-2">
+                                {b.logo ? (
+                                  <img src={b.logo} alt="Logo" className="w-6 h-6 rounded object-cover border border-slate-200" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-[10px]">
+                                    {b.name?.[0] || "B"}
+                                  </div>
+                                )}
+                                <span>{b.code || b.id}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-bold text-slate-900 leading-snug">{b.name}</p>
+                              {b.managerName && (
+                                <p className="text-xs text-brand-700 font-medium mt-0.5">Mgr: {b.managerName}</p>
+                              )}
+                              <p className="text-[11px] text-slate-400 mt-0.5 leading-normal truncate max-w-[200px]">{b.address}</p>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <p className="text-xs text-slate-800 font-semibold">{b.mobile}</p>
+                              {b.phone && <p className="text-[11px] text-slate-500">Ph: {b.phone}</p>}
+                              <p className="text-xs text-slate-500 mt-0.5">{b.email}</p>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{b.city || "N/A"}</span>
+                                {b.state && <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded">{b.state}</span>}
+                              </div>
+                              {b.pincode && <p className="text-[11px] text-slate-400 mt-1">PIN: {b.pincode}</p>}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={cn(
+                                "text-[10px] uppercase font-extrabold tracking-wider px-2.5 py-1 rounded-full",
+                                b.status === "Active" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-rose-50 text-rose-600 border border-rose-200"
+                              )}>
+                                {b.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => { setViewingBranch(b); setShowBranchViewModal(true); }}
+                                  className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-brand-600 rounded-lg transition-all cursor-pointer outline-none"
+                                  title="View Details"
+                                >
+                                  <Eye size={15} />
+                                </button>
+                                {isSoftwareOwner && hasModulePermission(currentUser, "masters", "edit") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEdit(b)}
+                                    className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-brand-650 rounded-lg transition-all cursor-pointer outline-none"
+                                    title="Edit Branch"
+                                  >
+                                    <Edit2 size={15} />
+                                  </button>
+                                )}
+                                {isSoftwareOwner && hasModulePermission(currentUser, "masters", "delete") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(b.id, b.name)}
+                                    className="p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all cursor-pointer outline-none"
+                                    title="Delete Branch"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table> : <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                       <Layers size={36} className="text-slate-300 stroke-[1.5] mb-2" />
@@ -977,65 +1056,294 @@ export default function Masters({
       {
     /* VIEW DETAILS DIALOG (SUPPLIER) */
   }
+      {/* VIEW DETAILS DIALOG (SUPPLIER) */}
       <AnimatePresence>
-        {showViewModal && viewingSupplier && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    onClick={() => setShowViewModal(false)}
-    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-  />
-            <motion.div
-    initial={{ opacity: 0, scale: 0.95, y: 15 }}
-    animate={{ opacity: 1, scale: 1, y: 0 }}
-    exit={{ opacity: 0, scale: 0.95, y: 15 }}
-    className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-  >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2 text-slate-900">
-                  <Users className="text-brand-600" size={18} />
-                  <h3 className="font-bold text-base">Supplier Details - {viewingSupplier.supplier_id}</h3>
+        {showViewModal && viewingSupplier && (() => {
+          const suppStats = calculateSupplierTotalStats(viewingSupplier, purchases, payments, vouchers);
+          const suppPurchases = suppStats.supplierPurchases;
+          const totalPurchaseVal = suppStats.totalPurchaseAmount;
+          const totalAdvanceVal = suppStats.totalAdvancePaid;
+          const totalPaymentEntriesVal = suppStats.totalPaymentReceived;
+          const currentOutstanding = suppStats.totalOutstanding;
+
+          const suppPayments = payments.filter((pm) => {
+            if (!pm || pm.isDeleted) return false;
+            
+            // Must be an outbound supplier payout, NEVER a customer sales receipt or customer payment
+            const isSupplierPayout =
+              pm.partyType === "Supplier" ||
+              pm.paymentType === "Supplier Payment" ||
+              pm.paymentType === "Purchase Payment" ||
+              pm.paymentType === "Supplier Advance";
+
+            if (!isSupplierPayout) return false;
+
+            const sId = viewingSupplier.id || viewingSupplier.supplier_id;
+            const sName = (viewingSupplier.supplier_name || viewingSupplier.name || "").trim().toLowerCase();
+
+            const matchParty =
+              (sId && (pm.partyId === sId || pm.supplierId === sId)) ||
+              (sName && pm.partyName && pm.partyName.trim().toLowerCase() === sName);
+
+            const matchPurchase = suppPurchases.some(
+              (p) =>
+                (p.purchase_id && (pm.purchaseId === p.purchase_id || pm.vehicleId === p.purchase_id)) ||
+                (p.id && (pm.purchaseId === p.id || pm.vehicleId === p.id))
+            );
+
+            return Boolean(matchParty || matchPurchase);
+          });
+
+          return (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowViewModal(false)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+              >
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                  <div className="flex items-center gap-2.5 text-slate-900">
+                    <Users className="text-brand-600" size={20} />
+                    <div>
+                      <h3 className="font-bold text-base">Supplier Full Profile - {viewingSupplier.supplier_name}</h3>
+                      <p className="text-xs text-slate-500 font-mono">ID: {viewingSupplier.supplier_id || viewingSupplier.id}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setShowViewModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+                    <X size={18} />
+                  </button>
                 </div>
-                <button type="button" onClick={() => setShowViewModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+
+                <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                  {/* Info Header */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Contact Mobile</span>
+                      <p className="font-bold text-slate-900 text-sm flex items-center gap-1"><Phone size={12} /> {viewingSupplier.supplier_mobile || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">City / Location</span>
+                      <p className="font-bold text-slate-800">{citiesList.find((c) => c.id === viewingSupplier.city_id)?.name || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Vehicles Supplied</span>
+                      <p className="font-bold text-slate-800">{suppPurchases.length} Vehicles</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Office Address</span>
+                      <p className="font-medium text-slate-700 truncate">{viewingSupplier.address || "N/A"}</p>
+                    </div>
+                  </div>
+
+                  {/* Financial Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Total Purchase Value</span>
+                      <p className="text-sm font-extrabold text-slate-900 font-mono">₹{totalPurchaseVal.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-200/60">
+                      <span className="text-[10px] font-bold text-amber-700 uppercase">Total Advance Paid</span>
+                      <p className="text-sm font-extrabold text-amber-800 font-mono">₹{totalAdvanceVal.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200/60">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase">Payment Entries</span>
+                      <p className="text-sm font-extrabold text-emerald-800 font-mono">₹{totalPaymentEntriesVal.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="bg-rose-50 p-3 rounded-xl border border-rose-200/60">
+                      <span className="text-[10px] font-bold text-rose-700 uppercase">Remaining Outstanding</span>
+                      <p className="text-sm font-black text-rose-800 font-mono">₹{currentOutstanding.toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+
+                  {/* Purchased Vehicles Table */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Supplied Vehicles & Purchase History</h4>
+                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
+                          <tr>
+                            <th className="py-2.5 px-3">Vehicle Details</th>
+                            <th className="py-2.5 px-3">Reg No</th>
+                            <th className="py-2.5 px-3 text-right">Purchase Price</th>
+                            <th className="py-2.5 px-3 text-right">Advance Paid</th>
+                            <th className="py-2.5 px-3 text-right">Payment Entries</th>
+                            <th className="py-2.5 px-3 text-right">Outstanding</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {suppPurchases.length > 0 ? (
+                            suppPurchases.map((p) => {
+                              const tCost = p.stats ? p.stats.purchasePrice : (Number(p.purchasePrice || p.purchase_price) || 0);
+                              const adv = p.stats ? p.stats.advancePaid : (Number(p.advance_price !== undefined && p.advance_price !== null && p.advance_price !== "" ? p.advance_price : (p.advancePaid !== undefined && p.advancePaid !== null && p.advancePaid !== "" ? p.advancePaid : 0)));
+                              const pmPaid = p.stats ? p.stats.paymentReceived : 0;
+                              const bal = p.stats ? p.stats.outstanding : Math.max(0, tCost - adv - pmPaid);
+                              return (
+                                <tr key={p.id || p.purchase_id} className="hover:bg-slate-50">
+                                  <td className="py-2.5 px-3 font-bold text-slate-900">{p.brand} {p.name}</td>
+                                  <td className="py-2.5 px-3 font-mono text-slate-600">{p.reg_no || p.regNo || "N/A"}</td>
+                                  <td className="py-2.5 px-3 font-mono text-right font-semibold">₹{tCost.toLocaleString("en-IN")}</td>
+                                  <td className="py-2.5 px-3 font-mono text-right text-amber-700">₹{adv.toLocaleString("en-IN")}</td>
+                                  <td className="py-2.5 px-3 font-mono text-right text-emerald-700">₹{pmPaid.toLocaleString("en-IN")}</td>
+                                  <td className="py-2.5 px-3 font-mono text-right font-bold text-rose-600">₹{bal.toLocaleString("en-IN")}</td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="py-4 text-center text-slate-400">No purchase records found for this supplier.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Supplier Payment History */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Entries History</h4>
+                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
+                          <tr>
+                            <th className="py-2.5 px-3">Date</th>
+                            <th className="py-2.5 px-3">Ref No</th>
+                            <th className="py-2.5 px-3">Vehicle</th>
+                            <th className="py-2.5 px-3 text-right">Exact Paid</th>
+                            <th className="py-2.5 px-3">Mode</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {suppPayments.length > 0 ? (
+                            suppPayments.map((pm) => (
+                              <tr key={pm.id} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-3 font-mono text-slate-600">{pm.paymentDate}</td>
+                                <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">{pm.referenceNo}</td>
+                                <td className="py-2.5 px-3 text-slate-700">{pm.regNo || pm.vehicleName || "—"}</td>
+                                <td className="py-2.5 px-3 font-mono text-right font-black text-emerald-600">₹{(Number(pm.amountPaid) || 0).toLocaleString("en-IN")}</td>
+                                <td className="py-2.5 px-3 font-medium text-slate-600">{pm.paymentMode}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="py-4 text-center text-slate-400">No payment entries recorded.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                  <button type="button" onClick={() => setShowViewModal(false)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-5 py-2 rounded-xl text-xs font-bold cursor-pointer">
+                    Close Details
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* VIEW DETAILS DIALOG (BRANCH) */}
+      <AnimatePresence>
+        {showBranchViewModal && viewingBranch && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowBranchViewModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2.5 text-slate-900">
+                  <Building2 className="text-brand-600" size={20} />
+                  <div>
+                    <h3 className="font-bold text-base">{viewingBranch.name}</h3>
+                    <p className="text-[11px] font-mono font-semibold text-slate-500">Code: {viewingBranch.code || viewingBranch.id}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowBranchViewModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
                   <X size={18} />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="bg-slate-50 p-4 rounded-xl space-y-3 text-sm">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Supplier Name</label>
-                    <p className="font-bold text-slate-900 text-lg">{viewingSupplier.supplier_name}</p>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mobile Number</label>
-                    <p className="font-bold text-slate-800 text-base flex items-center gap-1.5"><Phone size={13} className="text-slate-400" />{viewingSupplier.supplier_mobile}</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
+
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    {viewingBranch.logo ? (
+                      <img src={viewingBranch.logo} alt="Branch Logo" className="w-12 h-12 rounded-xl object-cover border border-slate-200" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-lg">
+                        {viewingBranch.name?.[0] || "B"}
+                      </div>
+                    )}
                     <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase block">City</label>
-                      <p className="font-bold text-slate-700 text-xs">{citiesList.find((c) => c.id === viewingSupplier.city_id)?.name || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase block">Area</label>
-                      <p className="font-bold text-slate-700 text-xs">{areasList.find((a) => a.id === viewingSupplier.area_id)?.name || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-400 uppercase block">Sub Area</label>
-                      <p className="font-bold text-slate-700 text-xs">{subAreasList.find((sa) => sa.id === viewingSupplier.sub_area_id)?.name || "N/A"}</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase">Manager Name</p>
+                      <p className="text-sm font-extrabold text-slate-800">{viewingBranch.managerName || "Not Assigned"}</p>
                     </div>
                   </div>
-                  {viewingSupplier.address && <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Office Address</label>
-                      <p className="text-slate-700 font-semibold text-xs whitespace-pre-wrap">{viewingSupplier.address}</p>
-                    </div>}
+                  <span className={cn(
+                    "text-[10px] uppercase font-extrabold tracking-wider px-2.5 py-1 rounded-full",
+                    viewingBranch.status === "Active" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-rose-50 text-rose-600 border border-rose-200"
+                  )}>
+                    {viewingBranch.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+                    <p className="font-bold text-slate-400 text-[10px] uppercase">Mobile Number</p>
+                    <p className="font-bold text-slate-800">{viewingBranch.mobile || "N/A"}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+                    <p className="font-bold text-slate-400 text-[10px] uppercase">Phone (Landline)</p>
+                    <p className="font-bold text-slate-800">{viewingBranch.phone || "N/A"}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+                    <p className="font-bold text-slate-400 text-[10px] uppercase">Email Address</p>
+                    <p className="font-bold text-slate-800 truncate">{viewingBranch.email || "N/A"}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+                    <p className="font-bold text-slate-400 text-[10px] uppercase">GST Number</p>
+                    <p className="font-mono font-bold text-slate-800">{viewingBranch.gstNo || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl space-y-2 text-xs">
+                  <p className="font-bold text-slate-400 text-[10px] uppercase">Address & Location</p>
+                  <p className="font-semibold text-slate-800">{viewingBranch.address || "N/A"}</p>
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60">
+                    <span className="font-bold text-slate-700">City: {viewingBranch.city || "N/A"}</span>
+                    <span>•</span>
+                    <span className="font-bold text-brand-600">State: {viewingBranch.state || "N/A"}</span>
+                    <span>•</span>
+                    <span className="font-mono font-bold text-slate-600">PIN: {viewingBranch.pincode || "N/A"}</span>
+                  </div>
                 </div>
               </div>
+
               <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                <button type="button" onClick={() => setShowViewModal(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 rounded-xl text-xs font-bold cursor-pointer outline-none">Close Details</button>
+                <button type="button" onClick={() => setShowBranchViewModal(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 rounded-xl text-xs font-bold cursor-pointer outline-none">Close Details</button>
               </div>
             </motion.div>
-          </div>}
+          </div>
+        )}
       </AnimatePresence>
 
       {
@@ -1078,101 +1386,171 @@ export default function Masters({
     /* Specific form details for Branches or Suppliers */
   }
                 {activeSubTab === "branches" ? <>
-                    <div className="space-y-1 font-sans">
-                      <label className="text-xs font-bold text-slate-700">Branch ID</label>
-                      <input
-    type="text"
-    value={brId}
-    disabled
-    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 font-mono font-bold text-sm leading-5 rounded-xl cursor-not-allowed outline-none"
-  />
+                    <div className="grid grid-cols-2 gap-3 font-sans">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Branch Code <span className="text-rose-500">*</span></label>
+                        <input
+                          type="text"
+                          value={brCode}
+                          onChange={(e) => setBrCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. BR001 / CBE01"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-mono font-bold text-slate-800"
+                        />
+                        {formErrors.code && <p className="text-rose-600 text-[11px] font-semibold leading-tight mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.code}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Manager Name</label>
+                        <input
+                          type="text"
+                          value={brManagerName}
+                          onChange={(e) => setBrManagerName(e.target.value)}
+                          placeholder="e.g. Rajesh Kumar"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-semibold text-slate-800"
+                        />
+                      </div>
                     </div>
+
                     <div className="space-y-1 font-sans">
                       <label className="text-xs font-bold text-slate-700">Branch Name <span className="text-rose-500">*</span></label>
                       <input
-    type="text"
-    value={brName}
-    onChange={(e) => setBrName(e.target.value)}
-    placeholder="e.g. Coimbatore Main HQ"
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
+                        type="text"
+                        value={brName}
+                        onChange={(e) => setBrName(e.target.value)}
+                        placeholder="e.g. Coimbatore Main HQ"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm font-bold text-slate-800"
+                      />
                       {formErrors.name && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.name}</p>}
                     </div>
-                    <div className="space-y-1 font-sans">
-                      <label className="text-xs font-bold text-slate-700">10-Digit Mobile Phone <span className="text-rose-500">*</span></label>
-                      <input
-    type="tel"
-    maxLength={10}
-    value={brMobile}
-    onChange={(e) => setBrMobile(e.target.value.replace(/\D/g, ""))}
-    placeholder="e.g. 9840212345"
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
-                      {formErrors.mobile && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.mobile}</p>}
+
+                    <div className="grid grid-cols-2 gap-3 font-sans">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">10-Digit Mobile Phone <span className="text-rose-500">*</span></label>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={brMobile}
+                          onChange={(e) => setBrMobile(e.target.value.replace(/\D/g, ""))}
+                          placeholder="e.g. 9840212345"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-semibold text-slate-800"
+                        />
+                        {formErrors.mobile && <p className="text-rose-600 text-[11px] font-semibold leading-tight mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.mobile}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Phone (Landline)</label>
+                        <input
+                          type="text"
+                          value={brPhone}
+                          onChange={(e) => setBrPhone(e.target.value)}
+                          placeholder="e.g. 0422-2490000"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-semibold text-slate-800"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1 font-sans">
-                      <label className="text-xs font-bold text-slate-700">Email Address <span className="text-rose-500">*</span></label>
-                      <input
-    type="email"
-    value={brEmail}
-    onChange={(e) => setBrEmail(e.target.value)}
-    placeholder="e.g. coimbatore@auto360.com"
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
-                      {formErrors.email && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.email}</p>}
+
+                    <div className="grid grid-cols-2 gap-3 font-sans">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Email Address <span className="text-rose-500">*</span></label>
+                        <input
+                          type="email"
+                          value={brEmail}
+                          onChange={(e) => setBrEmail(e.target.value)}
+                          placeholder="e.g. branch@auto360.com"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-semibold text-slate-800"
+                        />
+                        {formErrors.email && <p className="text-rose-600 text-[11px] font-semibold leading-tight mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.email}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">GST Number</label>
+                        <input
+                          type="text"
+                          maxLength={15}
+                          value={brGstNo}
+                          onChange={(e) => setBrGstNo(e.target.value.toUpperCase())}
+                          placeholder="e.g. 33AAAAA0000A1Z5"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-mono font-bold text-slate-800"
+                        />
+                      </div>
                     </div>
+
                     <div className="grid grid-cols-3 gap-2 font-sans">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-700">City</label>
                         <input
-    type="text"
-    value={brCity}
-    onChange={(e) => setBrCity(e.target.value)}
-    placeholder="Coimbatore"
-    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800"
-  />
+                          type="text"
+                          value={brCity}
+                          onChange={(e) => setBrCity(e.target.value)}
+                          placeholder="Coimbatore"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800"
+                        />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 font-sans">Area</label>
-                        <input
-    type="text"
-    value={brArea}
-    onChange={(e) => setBrArea(e.target.value)}
-    placeholder="Gandhipuram"
-    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800"
-  />
+                        <label className="text-xs font-bold text-slate-700">State</label>
+                        <select
+                          value={brState}
+                          onChange={(e) => setBrState(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-semibold text-slate-800"
+                        >
+                          <option value="">Select State</option>
+                          {INDIAN_STATES.map((s) => (
+                            <option key={s.code} value={s.label}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 font-sans">Sub Area</label>
+                        <label className="text-xs font-bold text-slate-700">Pincode</label>
                         <input
-    type="text"
-    value={brSubArea}
-    onChange={(e) => setBrSubArea(e.target.value)}
-    placeholder="Cross Cut Rd"
-    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800"
-  />
+                          type="text"
+                          maxLength={6}
+                          value={brPincode}
+                          onChange={(e) => setBrPincode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="641012"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800 font-mono"
+                        />
                       </div>
                     </div>
-                    <div className="space-y-1 font-sans">
-                      <label className="text-xs font-bold text-slate-700">Status</label>
-                      <select
-    value={brStatus}
-    onChange={(e) => setBrStatus(e.target.value)}
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-semibold"
-  >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3 font-sans">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Status</label>
+                        <select
+                          value={brStatus}
+                          onChange={(e) => setBrStatus(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs text-slate-800 font-semibold"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Branch Logo</label>
+                        <div className="flex items-center gap-2">
+                          <label className="flex-1 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer">
+                            <Upload size={14} />
+                            {isUploadingBrLogo ? "Uploading..." : brLogo ? "Change Logo" : "Upload Logo"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleBranchLogoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          {brLogo && (
+                            <img src={brLogo} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-slate-300" />
+                          )}
+                        </div>
+                      </div>
                     </div>
+
                     <div className="space-y-1 font-sans">
                       <label className="text-xs font-bold text-slate-700">Office Address <span className="text-rose-500">*</span></label>
                       <textarea
-    rows={2}
-    value={brAddress}
-    onChange={(e) => setBrAddress(e.target.value)}
-    placeholder="Complete street address..."
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
+                        rows={2}
+                        value={brAddress}
+                        onChange={(e) => setBrAddress(e.target.value)}
+                        placeholder="Complete street address..."
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
+                      />
                       {formErrors.address && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.address}</p>}
                     </div>
                   </> : activeSubTab === "suppliers" ? <>
@@ -1213,10 +1591,14 @@ export default function Masters({
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-600">Select City</label>
                         <select
-    value={supCityId}
-    onChange={(e) => setSupCityId(e.target.value)}
-    className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-550 focus:border-brand-550"
-  >
+                          value={supCityId}
+                          onChange={(e) => {
+                            setSupCityId(e.target.value);
+                            setSupAreaId("");
+                            setSupSubAreaId("");
+                          }}
+                          className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-550 focus:border-brand-550 font-bold"
+                        >
                           <option value="">-- Choose City --</option>
                           {citiesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
@@ -1224,25 +1606,28 @@ export default function Masters({
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-600">Dependent Area</label>
                         <select
-    value={supAreaId}
-    onChange={(e) => setSupAreaId(e.target.value)}
-    disabled={!supCityId}
-    className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400"
-  >
+                          value={supAreaId}
+                          onChange={(e) => {
+                            setSupAreaId(e.target.value);
+                            setSupSubAreaId("");
+                          }}
+                          disabled={!supCityId}
+                          className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400 font-bold"
+                        >
                           <option value="">-- Choose Area --</option>
-                          {areasList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          {areasList.filter((a) => !supCityId || a.cityId === supCityId).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-600">Dependent Sub Area</label>
                         <select
-    value={supSubAreaId}
-    onChange={(e) => setSupSubAreaId(e.target.value)}
-    disabled={!supAreaId}
-    className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400"
-  >
+                          value={supSubAreaId}
+                          onChange={(e) => setSupSubAreaId(e.target.value)}
+                          disabled={!supAreaId}
+                          className="w-full px-3 py-1.5 bg-white border rounded-xl text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400 font-bold"
+                        >
                           <option value="">-- Choose Sub Area --</option>
-                          {subAreasList.map((sa) => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
+                          {subAreasList.filter((sa) => !supAreaId || sa.areaId === supAreaId).map((sa) => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
                         </select>
                       </div>
                     </div>
