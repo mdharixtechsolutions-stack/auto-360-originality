@@ -604,18 +604,19 @@ app.get("/api/settings/general", (req, res) => {
 
 app.post("/api/settings/general", (req, res) => {
   const db = readDb();
-  const { appName, defaultState, currency, timezone, language } = req.body;
+  const { appName, companyName, defaultState, currency, timezone, language } = req.body;
+  const nameToUse = companyName || appName;
 
   if (!db.general_settings) db.general_settings = {};
-  if (appName !== undefined) db.general_settings.appName = appName;
+  if (nameToUse !== undefined) db.general_settings.appName = nameToUse;
   if (defaultState !== undefined) db.general_settings.defaultState = defaultState;
   if (currency !== undefined) db.general_settings.currency = currency;
   if (timezone !== undefined) db.general_settings.timezone = timezone;
   if (language !== undefined) db.general_settings.language = language;
 
   if (!db.business_profile) db.business_profile = {};
-  if (appName) db.business_profile.companyName = appName;
-  if (defaultState) {
+  if (nameToUse !== undefined) db.business_profile.companyName = nameToUse;
+  if (defaultState !== undefined) {
     db.business_profile.defaultState = defaultState;
     db.business_profile.state = defaultState;
   }
@@ -628,7 +629,7 @@ app.get("/api/settings/profile", (req, res) => {
   const db = readDb();
   if (!db.business_profile) {
     db.business_profile = {
-      companyName: "Auto360 ERP",
+      companyName: db.general_settings?.appName || "AUTO360 ERP",
       companyLogo: "",
       address: "",
       city: "",
@@ -652,6 +653,9 @@ app.get("/api/settings/profile", (req, res) => {
     };
     writeDb(db);
   }
+  if (db.general_settings?.appName) {
+    db.business_profile.companyName = db.general_settings.appName;
+  }
   if (!db.business_profile.defaultState) {
     db.business_profile.defaultState = db.general_settings?.defaultState || db.business_profile.state || "Tamil Nadu";
     writeDb(db);
@@ -663,6 +667,7 @@ app.post("/api/settings/profile", (req, res) => {
   const db = readDb();
   const {
     companyName,
+    appName,
     companyLogo,
     address,
     city,
@@ -685,10 +690,11 @@ app.post("/api/settings/profile", (req, res) => {
     upiQr
   } = req.body;
 
+  const nameToUse = companyName !== undefined ? companyName : (appName !== undefined ? appName : db.business_profile?.companyName);
   const activeDefaultState = defaultState || state || db.business_profile?.defaultState || "Tamil Nadu";
   db.business_profile = {
     ...(db.business_profile || {}),
-    companyName: companyName !== undefined ? companyName : (db.business_profile?.companyName || "AUTO360 ERP"),
+    companyName: nameToUse !== undefined ? nameToUse : (db.business_profile?.companyName || "AUTO360 ERP"),
     companyLogo: companyLogo !== undefined ? companyLogo : (db.business_profile?.companyLogo || ""),
     address: address !== undefined ? address : (db.business_profile?.address || ""),
     city: city !== undefined ? city : (db.business_profile?.city || ""),
@@ -713,7 +719,7 @@ app.post("/api/settings/profile", (req, res) => {
 
   if (!db.general_settings) db.general_settings = {};
   db.general_settings.defaultState = activeDefaultState;
-  if (companyName) db.general_settings.appName = companyName;
+  if (nameToUse !== undefined) db.general_settings.appName = nameToUse;
 
   writeDb(db);
   res.json({ success: true, business_profile: db.business_profile, general_settings: db.general_settings });
