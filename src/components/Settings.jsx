@@ -324,10 +324,34 @@ function BusinessProfile({ businessProfile, setBusinessProfile, showToast, onRef
       if (data.filePath) {
         if (type === "logo") {
           setCompanyLogo(data.filePath);
-          showToast("Company logo uploaded successfully!");
+          const saveRes = await fetch("/api/settings/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ companyLogo: data.filePath }),
+          });
+          if (saveRes.ok) {
+            const saveData = await saveRes.json();
+            if (saveData.success) {
+              if (setBusinessProfile) setBusinessProfile(saveData.business_profile);
+              if (onRefreshData) onRefreshData();
+            }
+          }
+          showToast("Company logo uploaded & updated across app!");
         } else {
           setUpiQr(data.filePath);
-          showToast("UPI QR code uploaded successfully!");
+          const saveRes = await fetch("/api/settings/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ upiQr: data.filePath }),
+          });
+          if (saveRes.ok) {
+            const saveData = await saveRes.json();
+            if (saveData.success) {
+              if (setBusinessProfile) setBusinessProfile(saveData.business_profile);
+              if (onRefreshData) onRefreshData();
+            }
+          }
+          showToast("UPI QR code uploaded & updated successfully!");
         }
       }
     } catch (err) {

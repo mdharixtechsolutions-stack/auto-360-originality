@@ -686,29 +686,29 @@ app.post("/api/settings/profile", (req, res) => {
   } = req.body;
 
   const activeDefaultState = defaultState || state || db.business_profile?.defaultState || "Tamil Nadu";
-
   db.business_profile = {
-    companyName: companyName || "",
-    companyLogo: companyLogo || "",
-    address: address || "",
-    city: city || "",
+    ...(db.business_profile || {}),
+    companyName: companyName !== undefined ? companyName : (db.business_profile?.companyName || "AUTO360 ERP"),
+    companyLogo: companyLogo !== undefined ? companyLogo : (db.business_profile?.companyLogo || ""),
+    address: address !== undefined ? address : (db.business_profile?.address || ""),
+    city: city !== undefined ? city : (db.business_profile?.city || ""),
     state: state || activeDefaultState,
     defaultState: activeDefaultState,
-    country: country || "",
-    pincode: pincode || "",
-    mobileNumber: mobileNumber || "",
-    whatsAppNumber: whatsAppNumber || "",
-    email: email || "",
-    website: website || "",
-    gstNumber: gstNumber || "",
-    socialMedia: socialMedia || "",
-    termsAndConditions: termsAndConditions || "",
-    bankName: bankName || "",
-    accountNumber: accountNumber || "",
-    branchName: branchName || "",
-    ifscCode: ifscCode || "",
-    upiId: upiId || "",
-    upiQr: upiQr || ""
+    country: country !== undefined ? country : (db.business_profile?.country || ""),
+    pincode: pincode !== undefined ? pincode : (db.business_profile?.pincode || ""),
+    mobileNumber: mobileNumber !== undefined ? mobileNumber : (db.business_profile?.mobileNumber || ""),
+    whatsAppNumber: whatsAppNumber !== undefined ? whatsAppNumber : (db.business_profile?.whatsAppNumber || ""),
+    email: email !== undefined ? email : (db.business_profile?.email || ""),
+    website: website !== undefined ? website : (db.business_profile?.website || ""),
+    gstNumber: gstNumber !== undefined ? gstNumber : (db.business_profile?.gstNumber || ""),
+    socialMedia: socialMedia !== undefined ? socialMedia : (db.business_profile?.socialMedia || ""),
+    termsAndConditions: termsAndConditions !== undefined ? termsAndConditions : (db.business_profile?.termsAndConditions || ""),
+    bankName: bankName !== undefined ? bankName : (db.business_profile?.bankName || ""),
+    accountNumber: accountNumber !== undefined ? accountNumber : (db.business_profile?.accountNumber || ""),
+    branchName: branchName !== undefined ? branchName : (db.business_profile?.branchName || ""),
+    ifscCode: ifscCode !== undefined ? ifscCode : (db.business_profile?.ifscCode || ""),
+    upiId: upiId !== undefined ? upiId : (db.business_profile?.upiId || ""),
+    upiQr: upiQr !== undefined ? upiQr : (db.business_profile?.upiQr || "")
   };
 
   if (!db.general_settings) db.general_settings = {};

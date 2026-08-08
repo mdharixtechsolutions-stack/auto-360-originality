@@ -1698,7 +1698,7 @@ export default function App() {
         />;
     }
   };
-  return <div key={language} className="min-h-screen flex bg-slate-50 relative overflow-hidden">
+  return <div key={language} className="h-screen w-screen flex bg-slate-50 relative overflow-hidden">
       {
     /* Mobile Blur Backdrop overlay */
   }
@@ -1930,7 +1930,7 @@ export default function App() {
       {
     /* Main Content */
   }
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {
     /* Header */
   }
