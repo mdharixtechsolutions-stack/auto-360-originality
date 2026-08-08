@@ -1514,8 +1514,6 @@ export default function App() {
           businessProfile={businessProfile}
           onNavigate={handleNavigate}
           onRefreshData={loadSyncData}
-          payments={payments}
-          vouchers={voucherEntries}
         />;
       case "purchase":
         return <Purchase
