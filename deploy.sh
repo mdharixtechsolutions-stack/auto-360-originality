@@ -84,7 +84,7 @@ echo "🌐 Configuring Nginx reverse proxy..."
 cat > /etc/nginx/sites-available/auto360 << 'NGINXEOF'
 server {
     listen 80;
-    server_name 360auto.harixtechsolutions.com _;
+    server_name auto360.harixtechsolutions.com 360auto.harixtechsolutions.com _;
 
     # Increase upload size for file uploads
     client_max_body_size 50M;
