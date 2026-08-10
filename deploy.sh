@@ -50,8 +50,9 @@ if [ ! -f ".env" ]; then
   echo "  Creating .env file..."
   cat > .env << 'ENVEOF'
 MONGODB_URI=mongodb+srv://mdharixtechsolutions_db_user:x1ZBcxPMARJharUV@cluster0.xkk9qnw.mongodb.net/auto360?retryWrites=true&w=majority&appName=Cluster0
+PORT=3003
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
-APP_URL=https://360auto.harixtechsolutions.com
+APP_URL=https://auto360.harixtechsolutions.com
 ADMIN_SECRET_CODE=HarixTechAdmin2026
 JWT_SECRET=auto360_jwt_secret_2026_secure
 ENVEOF
@@ -84,13 +85,13 @@ echo "🌐 Configuring Nginx reverse proxy..."
 cat > /etc/nginx/sites-available/auto360 << 'NGINXEOF'
 server {
     listen 80;
-    server_name auto360.harixtechsolutions.com 360auto.harixtechsolutions.com _;
+    server_name auto360.harixtechsolutions.com 360auto.harixtechsolutions.com;
 
     # Increase upload size for file uploads
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3003;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
