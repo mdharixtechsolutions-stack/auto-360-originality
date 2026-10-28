@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, default: "" },
   mobile: { type: String, default: "" },
   role: { type: String, required: true, default: "Staff" },
-  branch: { type: String, default: "Coimbatore" },
+  branch: { type: String, default: "Tiruppur" },
   branch_id: { type: String, default: "BR001" },
   isActive: { type: Boolean, default: true },
   loginTimeFrom: { type: String, default: "00:00" },

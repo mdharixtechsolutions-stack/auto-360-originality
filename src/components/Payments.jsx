@@ -43,7 +43,7 @@ export function Payments({
   payments = [],
   onSavePayment,
   onDeletePayment,
-  currentBranch = "Coimbatore",
+  currentBranch = "Tiruppur",
   initialSubTab = "customer",
   businessProfile = {}
 }) {
@@ -985,7 +985,7 @@ export function Payments({
                         <td className="py-3 px-3 font-mono text-right font-bold text-rose-600">
                           ₹{outAfter.toLocaleString("en-IN")}
                         </td>
-                        <td className="py-3 px-3 font-medium text-slate-700">{p.branch || "Coimbatore"}</td>
+                        <td className="py-3 px-3 font-medium text-slate-700">{p.branch || "Tiruppur"}</td>
                         <td className="py-3 px-3 font-semibold text-slate-700">{p.paymentMode}</td>
                         <td className="py-3 px-3 text-slate-500 font-medium">{p.createdBy || "Staff"}</td>
                         <td className="py-3 px-3 text-center">

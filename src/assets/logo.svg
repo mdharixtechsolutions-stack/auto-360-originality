@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#090D16" />
+    </linearGradient>
+
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="50%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#64748B" />
+    </linearGradient>
+
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Card -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
+  <rect x="12" y="12" width="488" height="488" rx="98" fill="none" stroke="url(#accentGrad)" stroke-width="8" opacity="0.85" />
+
+  <!-- Outer Speed Ring -->
+  <circle cx="256" cy="256" r="215" fill="none" stroke="url(#silverGrad)" stroke-width="4" opacity="0.25" stroke-dasharray="16 12" />
+
+  <!-- Dynamic Auto 360 Wings / Shield -->
+  <g transform="translate(0, 5)">
+    <!-- Lower Car Silhouette Base -->
+    <path d="M 120 310 C 140 250, 180 220, 256 220 C 332 220, 372 250, 392 310 Z" fill="none" stroke="url(#cyanGlow)" stroke-width="12" stroke-linejoin="round" />
+    
+    <!-- Roof Arc -->
+    <path d="M 165 245 C 190 175, 322 175, 347 245" fill="none" stroke="url(#silverGrad)" stroke-width="18" stroke-linecap="round" />
+
+    <!-- Center Speed Badge Emblem (Auto 360 Monogram Accent) -->
+    <path d="M 195 285 L 317 285 L 290 335 L 168 335 Z" fill="url(#accentGrad)" filter="url(#glow)" />
+    
+    <!-- Stylized S Curve -->
+    <path d="M 230 190 C 290 190, 290 230, 256 240 C 222 250, 222 290, 282 290" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" />
+
+    <!-- Headlight Accents -->
+    <ellipse cx="150" cy="300" rx="22" ry="8" fill="#38BDF8" transform="rotate(-10 150 300)" opacity="0.9" />
+    <ellipse cx="362" cy="300" rx="22" ry="8" fill="#38BDF8" transform="rotate(10 362 300)" opacity="0.9" />
+  </g>
+</svg>

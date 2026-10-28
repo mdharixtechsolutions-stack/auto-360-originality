@@ -1,9 +1,9 @@
 {
   "business_profile": {
-    "companyName": "AUTO360 ERP",
+    "companyName": "Auto 360",
     "companyLogo": "",
     "address": "",
-    "city": "",
+    "city": "Tiruppur",
     "state": "Tamil Nadu",
     "defaultState": "Tamil Nadu",
     "country": "",
@@ -23,7 +23,7 @@
     "upiQr": ""
   },
   "general_settings": {
-    "appName": "AUTO360 ERP",
+    "appName": "Auto 360",
     "defaultState": "Tamil Nadu",
     "currency": "INR (₹)",
     "timezone": "Asia/Kolkata",
@@ -43,10 +43,61 @@
       "address": "",
       "created_at": "2026-08-08T11:01:12.853Z",
       "updated_at": "2026-08-08T11:01:12.853Z",
+      "branch": "Tiruppur"
+    }
+  ],
+  "customers": [
+    {
+      "customer_id": "CUS002",
+      "id": "CUS002",
+      "customer_type": "Sell",
+      "customer_name": "Ramesh S",
+      "name": "Ramesh S",
+      "customer_mobile": "9876543211",
+      "mobile": "9876543211",
+      "source": "Walk In",
+      "aadhaar_number": "",
+      "pan_number": "",
+      "city_id": "",
+      "area_id": "",
+      "sub_area_id": "",
+      "address": "",
+      "customer_photo": "",
+      "aadhaar_photo": "",
+      "pan_photo": "",
+      "customer_status": "New Lead",
+      "preferred_vehicle": "",
+      "remarks_notes": "",
+      "created_at": "2026-09-16T03:28:01.164Z",
+      "updated_at": "2026-09-16T03:28:01.164Z",
+      "branch": "Tiruppur"
+    },
+    {
+      "customer_id": "CUS001",
+      "id": "CUS001",
+      "customer_type": "Sell",
+      "customer_name": "Vignesh Kumar",
+      "name": "Vignesh Kumar",
+      "customer_mobile": "9876543210",
+      "mobile": "9876543210",
+      "source": "Walk In",
+      "aadhaar_number": "",
+      "pan_number": "",
+      "city_id": "",
+      "area_id": "",
+      "sub_area_id": "",
+      "address": "123 Main St, Coimbatore",
+      "customer_photo": "",
+      "aadhaar_photo": "",
+      "pan_photo": "",
+      "customer_status": "New Lead",
+      "preferred_vehicle": "",
+      "remarks_notes": "",
+      "created_at": "2026-09-16T03:22:10.086Z",
+      "updated_at": "2026-09-16T03:22:10.086Z",
       "branch": "Coimbatore"
     }
   ],
-  "customers": [],
   "purchases": [],
   "deals": [],
   "sales": [],
@@ -56,8 +107,37 @@
   "payments": [],
   "receipts": [],
   "income": [],
-  "login_reports": [],
-  "login_audit": [],
+  "login_reports": [
+    {
+      "id": "LR-1789529040278",
+      "username": "John Super Admin",
+      "role": "Super Admin",
+      "loginDate": "2026-09-16",
+      "loginTime": "08:53:59",
+      "logoutTime": "",
+      "sessionDuration": "",
+      "ipAddress": "127.0.0.1",
+      "branch": "Tiruppur"
+    }
+  ],
+  "login_audit": [
+    {
+      "id": "LR-1789529040278",
+      "user_id": "S-1",
+      "username": "John Super Admin",
+      "role": "Super Admin",
+      "branch_id": "Tiruppur",
+      "branch": "Tiruppur",
+      "login_date": "2026-09-16",
+      "login_time": "08:53:59",
+      "logout_time": "",
+      "session_duration": "",
+      "ip_address": "127.0.0.1",
+      "device_info": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "status": "Active",
+      "created_at": "2026-09-16T03:24:00.278Z"
+    }
+  ],
   "activity_logs": [],
   "audit_logs": [],
   "notifications": [],
@@ -65,7 +145,7 @@
   "companies": [
     {
       "id": "CO001",
-      "name": "Auto360 ERP Client",
+      "name": "Auto 360 Client",
       "status": "Active",
       "createdAt": "2026-07-25T00:00:00.000Z"
     }
@@ -79,39 +159,13 @@
   "branches": [
     {
       "id": "BR001",
-      "name": "Coimbatore",
+      "name": "Tiruppur",
       "mobile": "9876500001",
-      "email": "coimbatore@auto360.com",
-      "address": "123 Avinashi Road, Gandhipuram",
-      "city": "Coimbatore",
-      "area": "Gandhipuram",
-      "subArea": "Cross Cut Road",
-      "status": "Active",
-      "isDeleted": false,
-      "createdAt": "2026-07-25T00:00:00.000Z"
-    },
-    {
-      "id": "BR002",
-      "name": "Erode",
-      "mobile": "9876500002",
-      "email": "erode@auto360.com",
-      "address": "45 Brough Road near Bus Stand",
-      "city": "Erode",
-      "area": "Erode Central",
-      "subArea": "Sathy Road",
-      "status": "Active",
-      "isDeleted": false,
-      "createdAt": "2026-07-25T00:00:00.000Z"
-    },
-    {
-      "id": "BR003",
-      "name": "Salem",
-      "mobile": "9876500003",
-      "email": "salem@auto360.com",
-      "address": "78 Junction Road, Opp Train Station",
-      "city": "Salem",
-      "area": "Salem Junction",
-      "subArea": "Meyyanur",
+      "email": "tiruppur@auto360.com",
+      "address": "Tiruppur Main Road",
+      "city": "Tiruppur",
+      "area": "Tiruppur Centre",
+      "subArea": "Main Road",
       "status": "Active",
       "isDeleted": false,
       "createdAt": "2026-07-25T00:00:00.000Z"
@@ -125,7 +179,7 @@
       "email": "admin@auto360.com",
       "mobile": "9876543210",
       "role": "Super Admin",
-      "branch": "Coimbatore",
+      "branch": "Tiruppur",
       "branch_id": "BR001",
       "isActive": true,
       "loginTimeFrom": "00:00",
@@ -358,6 +412,302 @@
       "group": "Loans (Liability)",
       "balance": 0,
       "type": "Credit"
+    }
+  ],
+  "brands": [
+    {
+      "id": "b1",
+      "name": "Maruti Suzuki",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b2",
+      "name": "Hyundai",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b3",
+      "name": "Tata Motors",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b4",
+      "name": "TVS",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b5",
+      "name": "Honda",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b6",
+      "name": "Hero",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b7",
+      "name": "Bajaj",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b8",
+      "name": "Ather",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b9",
+      "name": "Piaggio",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b10",
+      "name": "Mahindra",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b11",
+      "name": "Toyota",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b12",
+      "name": "MG",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b13",
+      "name": "Ashok Leyland",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b14",
+      "name": "Ola Electric",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "b_mu3jbbzj",
+      "name": "Ducati",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:22:00.175Z"
+    },
+    {
+      "id": "o3i172gub",
+      "name": "Yamaha",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:25:01.608Z"
+    }
+  ],
+  "vehicle_names": [
+    {
+      "id": "vn1",
+      "brandId": "b1",
+      "name": "Swift",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn2",
+      "brandId": "b1",
+      "name": "Baleno",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn3",
+      "brandId": "b2",
+      "name": "Creta",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn4",
+      "brandId": "b4",
+      "name": "Radeon",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn5",
+      "brandId": "b5",
+      "name": "Shine 125",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn6",
+      "brandId": "b6",
+      "name": "Splendor Plus",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn7",
+      "brandId": "b7",
+      "name": "Pulsar 150",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn8",
+      "brandId": "b8",
+      "name": "450X",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn9",
+      "brandId": "b7",
+      "name": "RE Compact",
+      "vehicleType": "Three Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn10",
+      "brandId": "b9",
+      "name": "Ape Xtra LDX",
+      "vehicleType": "Three Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn11",
+      "brandId": "b10",
+      "name": "Treo Zor",
+      "vehicleType": "Three Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn12",
+      "brandId": "b3",
+      "name": "Nexon",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn13",
+      "brandId": "b11",
+      "name": "Fortuner",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn14",
+      "brandId": "b12",
+      "name": "Hector",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn15",
+      "brandId": "b13",
+      "name": "Dost+",
+      "vehicleType": "Commercial",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn16",
+      "brandId": "b3",
+      "name": "Ace Gold",
+      "vehicleType": "Commercial",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn17",
+      "brandId": "b10",
+      "name": "Bolero Pickup",
+      "vehicleType": "Commercial",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn18",
+      "brandId": "b14",
+      "name": "S1 Pro",
+      "vehicleType": "Two Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn19",
+      "brandId": "b3",
+      "name": "Nexon EV",
+      "vehicleType": "Four Wheeler",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
+    },
+    {
+      "id": "vn20",
+      "brandId": "b10",
+      "name": "Treo Plus",
+      "vehicleType": "Commercial",
+      "isDeleted": false,
+      "createdBy": "Admin",
+      "createdAt": "2026-09-16T03:21:30.766Z"
     }
   ]
 }

@@ -21,7 +21,7 @@ const mockFollowUps = [
     status: "Today"
   }
 ];
-export default function FollowUps({ customers, currentUser }) {
+export default function FollowUps({ customers = [], currentUser }) {
   const [followUps, setFollowUps] = useState(mockFollowUps);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -35,8 +35,8 @@ export default function FollowUps({ customers, currentUser }) {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const filteredCustomers = useMemo(() => customers.filter(
-    (c) => !c.isDeleted && (c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile.includes(customerSearch))
+  const filteredCustomers = useMemo(() => (customers || []).filter(
+    (c) => !c.isDeleted && (((c.name || c.customer_name || "").toLowerCase().includes((customerSearch || "").toLowerCase())) || ((c.mobile || c.customer_mobile || "").includes(customerSearch || "")))
   ), [customers, customerSearch]);
   const filteredFollowUps = useMemo(
     () => followUps.filter((f) => {

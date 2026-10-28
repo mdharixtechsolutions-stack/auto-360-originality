@@ -11,7 +11,7 @@ const expenseSchema = new mongoose.Schema({
   expense_date: { type: String, default: "" },
   description: { type: String, default: "" },
   branch_id: { type: String, default: "BR001" },
-  branch: { type: String, default: "Coimbatore" },
+  branch: { type: String, default: "Tiruppur" },
   createdBy: { type: String, default: "system" },
   isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });

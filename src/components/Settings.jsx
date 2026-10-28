@@ -100,7 +100,7 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
 }
 function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRefreshData }) {
   const { language, setLanguage, t } = useLanguage();
-  const [appName, setAppName] = useState(businessProfile?.companyName || "AUTO360 ERP");
+  const [appName, setAppName] = useState(businessProfile?.companyName || "Auto 360");
   const [defaultState, setDefaultState] = useState(businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu");
   const [isSaving, setIsSaving] = useState(false);
 

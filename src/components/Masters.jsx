@@ -42,6 +42,7 @@ export default function Masters({
   onUpdateCustomers,
   initialTab,
   initialSubTab,
+  initialSearch,
   currentUser,
   isSoftwareOwner
 }) {
@@ -136,6 +137,12 @@ export default function Masters({
   const [generalError, setGeneralError] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState(null);
+  useEffect(() => {
+    if (initialSearch !== undefined && initialSearch !== "") {
+      setSupSearch(initialSearch);
+      setSupPage(1);
+    }
+  }, [initialSearch]);
   useEffect(() => {
     fetchAllLocationData();
   }, [propCities, propAreas, propSubAreas]);
@@ -379,9 +386,21 @@ export default function Masters({
           } catch (e) {
             console.error("Error deleting subarea", e);
           }
+        } else if (activeSubTab === "brands") {
+          try {
+            await fetch(`/api/brands/${id}`, { method: "DELETE" });
+          } catch (e) {
+            console.error("Error deleting brand", e);
+          }
+          onUpdateBrands(brands.filter((b) => b.id !== id));
+        } else if (activeSubTab === "names") {
+          try {
+            await fetch(`/api/vehicle-names/${id}`, { method: "DELETE" });
+          } catch (e) {
+            console.error("Error deleting vehicle model", e);
+          }
+          onUpdateVehicleNames(vehicleNames.filter((vn) => vn.id !== id));
         } else {
-          if (activeSubTab === "brands") onUpdateBrands(brands.filter((b) => b.id !== id));
-          if (activeSubTab === "names") onUpdateVehicleNames(vehicleNames.filter((vn) => vn.id !== id));
           if (activeSubTab === "customers") onUpdateCustomers(customers.filter((c) => c.id !== id));
         }
       }
@@ -626,11 +645,57 @@ export default function Masters({
         createdAt: editingItem?.createdAt || (/* @__PURE__ */ new Date()).toISOString()
       };
       if (activeSubTab === "brands") {
-        if (editingItem) onUpdateBrands(brands.map((b) => b.id === editingItem.id ? newItem : b));
-        else onUpdateBrands([...brands, newItem]);
+        try {
+          if (editingItem) {
+            fetch(`/api/brands/${editingItem.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newItem)
+            }).then(r => r.ok && r.json()).then(saved => {
+              if (saved) onUpdateBrands(brands.map((b) => b.id === editingItem.id ? saved : b));
+            }).catch(e => console.error(e));
+            onUpdateBrands(brands.map((b) => b.id === editingItem.id ? newItem : b));
+          } else {
+            fetch("/api/brands", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newItem)
+            }).then(r => r.ok && r.json()).then(saved => {
+              if (saved) onUpdateBrands([...brands.filter(b => b.id !== newItem.id && b.id !== saved.id), saved]);
+            }).catch(e => console.error(e));
+            onUpdateBrands([...brands, newItem]);
+          }
+        } catch (e) {
+          console.error("Error saving brand", e);
+          if (editingItem) onUpdateBrands(brands.map((b) => b.id === editingItem.id ? newItem : b));
+          else onUpdateBrands([...brands, newItem]);
+        }
       } else if (activeSubTab === "names") {
-        if (editingItem) onUpdateVehicleNames(vehicleNames.map((vn) => vn.id === editingItem.id ? newItem : vn));
-        else onUpdateVehicleNames([...vehicleNames, newItem]);
+        try {
+          if (editingItem) {
+            fetch(`/api/vehicle-names/${editingItem.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newItem)
+            }).then(r => r.ok && r.json()).then(saved => {
+              if (saved) onUpdateVehicleNames(vehicleNames.map((vn) => vn.id === editingItem.id ? saved : vn));
+            }).catch(e => console.error(e));
+            onUpdateVehicleNames(vehicleNames.map((vn) => vn.id === editingItem.id ? newItem : vn));
+          } else {
+            fetch("/api/vehicle-names", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newItem)
+            }).then(r => r.ok && r.json()).then(saved => {
+              if (saved) onUpdateVehicleNames([...vehicleNames.filter(vn => vn.id !== newItem.id && vn.id !== saved.id), saved]);
+            }).catch(e => console.error(e));
+            onUpdateVehicleNames([...vehicleNames, newItem]);
+          }
+        } catch (e) {
+          console.error("Error saving vehicle model", e);
+          if (editingItem) onUpdateVehicleNames(vehicleNames.map((vn) => vn.id === editingItem.id ? newItem : vn));
+          else onUpdateVehicleNames([...vehicleNames, newItem]);
+        }
       } else if (activeSubTab === "customers") {
         if (editingItem) onUpdateCustomers(customers.map((c) => c.id === editingItem.id ? newItem : c));
         else onUpdateCustomers([...customers, newItem]);

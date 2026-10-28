@@ -40,7 +40,7 @@ const ensureAdminUser = () => {
       email: "admin@auto360.com",
       mobile: "9876543210",
       role: "Super Admin",
-      branch: "Coimbatore",
+      branch: "Tiruppur",
       branch_id: "BR001",
       isActive: true,
       loginTimeFrom: "00:00",
@@ -114,6 +114,36 @@ const ensureAdminUser = () => {
 // Run administrative seeder
 ensureAdminUser();
 
+// Universal flexible matcher for IDs, registration numbers, phone numbers, and names
+function matchSearchQuery(fieldValue, query) {
+  if (fieldValue === undefined || fieldValue === null || query === undefined || query === null) return false;
+  const strField = String(fieldValue).toLowerCase().trim();
+  const strQuery = String(query).toLowerCase().trim();
+  if (!strQuery) return true;
+
+  // 1. Direct substring match
+  if (strField.includes(strQuery)) return true;
+
+  // 2. Stripped alphanumeric matching (handles "#PUR527", "PUR-527", "PUR 527", "TN 39DC7264", etc.)
+  const cleanField = strField.replace(/[^a-z0-9]/gi, "");
+  const cleanQuery = strQuery.replace(/[^a-z0-9]/gi, "");
+
+  if (cleanQuery && cleanField) {
+    if (cleanField.includes(cleanQuery) || cleanQuery.includes(cleanField)) {
+      return true;
+    }
+  }
+
+  // 3. Digits-only matching for IDs / phones / reg numbers (e.g. searching "527" matching "PUR00527" or "PUR527")
+  const digitsQuery = strQuery.replace(/\D/g, "");
+  const digitsField = strField.replace(/\D/g, "");
+  if (digitsQuery && digitsQuery.length >= 2 && digitsField && digitsField.includes(digitsQuery)) {
+    return true;
+  }
+
+  return false;
+}
+
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json());
@@ -183,11 +213,10 @@ app.use((req, res, next) => {
         req.body.branch = assignedBranch;
       }
       if (req.body.branch_id) {
-        // Map common branches Coimbatore Branch <-> Coimbatore
+        // Map common branches Tiruppur Branch <-> Tiruppur
         const cleanB = assignedBranch.toLowerCase().replace(/branch/gi, "").trim();
-        if (cleanB.includes("coimbatore")) req.body.branch_id = "BR001";
-        else if (cleanB.includes("erode")) req.body.branch_id = "BR002";
-        else if (cleanB.includes("salem")) req.body.branch_id = "BR003";
+        if (cleanB.includes("tiruppur")) req.body.branch_id = "BR001";
+        else req.body.branch_id = "BR001";
       }
     }
   }
@@ -254,7 +283,9 @@ app.use((req, res, next) => {
     path.startsWith("/api/cities") || 
     path.startsWith("/api/areas") || 
     path.startsWith("/api/subareas") || 
-    path.startsWith("/api/branches")
+    path.startsWith("/api/branches") ||
+    path.startsWith("/api/brands") ||
+    path.startsWith("/api/vehicle-names")
   ) {
     requestModule = "masters";
   } else if (path.startsWith("/api/reports") || path.startsWith("/api/login-reports")) {
@@ -587,7 +618,7 @@ app.get("/api/settings/general", (req, res) => {
   const db = readDb();
   if (!db.general_settings) {
     db.general_settings = {
-      appName: db.business_profile?.companyName || "AUTO360 ERP",
+      appName: db.business_profile?.companyName || "Auto 360",
       defaultState: db.business_profile?.defaultState || db.business_profile?.state || "Tamil Nadu",
       currency: "INR (₹)",
       timezone: "Asia/Kolkata",
@@ -629,7 +660,7 @@ app.get("/api/settings/profile", (req, res) => {
   const db = readDb();
   if (!db.business_profile) {
     db.business_profile = {
-      companyName: db.general_settings?.appName || "AUTO360 ERP",
+      companyName: db.general_settings?.appName || "Auto 360",
       companyLogo: "",
       address: "",
       city: "",
@@ -694,7 +725,7 @@ app.post("/api/settings/profile", (req, res) => {
   const activeDefaultState = defaultState || state || db.business_profile?.defaultState || "Tamil Nadu";
   db.business_profile = {
     ...(db.business_profile || {}),
-    companyName: nameToUse !== undefined ? nameToUse : (db.business_profile?.companyName || "AUTO360 ERP"),
+    companyName: nameToUse !== undefined ? nameToUse : (db.business_profile?.companyName || "Auto 360"),
     companyLogo: companyLogo !== undefined ? companyLogo : (db.business_profile?.companyLogo || ""),
     address: address !== undefined ? address : (db.business_profile?.address || ""),
     city: city !== undefined ? city : (db.business_profile?.city || ""),
@@ -980,25 +1011,180 @@ app.delete("/api/subareas/:id", (req, res) => {
   writeDb(db);
   res.json({ message: "Sub Area deleted successfully" });
 });
+
+const DEFAULT_INITIAL_BRANDS = [
+  { id: "b1", name: "Maruti Suzuki", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b2", name: "Hyundai", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b3", name: "Tata Motors", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b4", name: "TVS", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b5", name: "Honda", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b6", name: "Hero", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b7", name: "Bajaj", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b8", name: "Ather", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b9", name: "Piaggio", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b10", name: "Mahindra", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b11", name: "Toyota", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b12", name: "MG", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b13", name: "Ashok Leyland", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "b14", name: "Ola Electric", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() }
+];
+
+const DEFAULT_INITIAL_VEHICLE_NAMES = [
+  { id: "vn1", brandId: "b1", name: "Swift", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn2", brandId: "b1", name: "Baleno", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn3", brandId: "b2", name: "Creta", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn4", brandId: "b4", name: "Radeon", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn5", brandId: "b5", name: "Shine 125", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn6", brandId: "b6", name: "Splendor Plus", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn7", brandId: "b7", name: "Pulsar 150", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn8", brandId: "b8", name: "450X", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn9", brandId: "b7", name: "RE Compact", vehicleType: "Three Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn10", brandId: "b9", name: "Ape Xtra LDX", vehicleType: "Three Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn11", brandId: "b10", name: "Treo Zor", vehicleType: "Three Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn12", brandId: "b3", name: "Nexon", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn13", brandId: "b11", name: "Fortuner", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn14", brandId: "b12", name: "Hector", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn15", brandId: "b13", name: "Dost+", vehicleType: "Commercial", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn16", brandId: "b3", name: "Ace Gold", vehicleType: "Commercial", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn17", brandId: "b10", name: "Bolero Pickup", vehicleType: "Commercial", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn18", brandId: "b14", name: "S1 Pro", vehicleType: "Two Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn19", brandId: "b3", name: "Nexon EV", vehicleType: "Four Wheeler", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() },
+  { id: "vn20", brandId: "b10", name: "Treo Plus", vehicleType: "Commercial", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() }
+];
+
+app.get("/api/brands", (req, res) => {
+  const db = readDb();
+  if (!db.brands || db.brands.length === 0) {
+    db.brands = [...DEFAULT_INITIAL_BRANDS];
+    writeDb(db);
+  }
+  res.json(db.brands.filter(b => !b.isDeleted));
+});
+
+app.post("/api/brands", (req, res) => {
+  const db = readDb();
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: "Brand name is required" });
+  if (!db.brands) db.brands = [...DEFAULT_INITIAL_BRANDS];
+  const newBrand = {
+    id: req.body.id || "b_" + Date.now().toString(36),
+    name: name.trim(),
+    isDeleted: false,
+    createdBy: req.body.createdBy || "Admin",
+    createdAt: new Date().toISOString()
+  };
+  db.brands.push(newBrand);
+  writeDb(db);
+  res.status(201).json(newBrand);
+});
+
+app.put("/api/brands/:id", (req, res) => {
+  const db = readDb();
+  if (!db.brands) db.brands = [...DEFAULT_INITIAL_BRANDS];
+  const index = db.brands.findIndex(b => b.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Brand not found" });
+  db.brands[index] = {
+    ...db.brands[index],
+    ...req.body,
+    name: req.body.name ? req.body.name.trim() : db.brands[index].name
+  };
+  writeDb(db);
+  res.json(db.brands[index]);
+});
+
+app.delete("/api/brands/:id", (req, res) => {
+  const db = readDb();
+  if (!db.brands) db.brands = [...DEFAULT_INITIAL_BRANDS];
+  const index = db.brands.findIndex(b => b.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Brand not found" });
+  db.brands[index].isDeleted = true;
+  writeDb(db);
+  res.json({ message: "Brand deleted successfully" });
+});
+
+app.get("/api/vehicle-names", (req, res) => {
+  const { brandId, vehicleType } = req.query;
+  const db = readDb();
+  if (!db.vehicle_names || db.vehicle_names.length === 0) {
+    db.vehicle_names = [...DEFAULT_INITIAL_VEHICLE_NAMES];
+    writeDb(db);
+  }
+  let list = db.vehicle_names.filter(vn => !vn.isDeleted);
+  if (brandId) {
+    list = list.filter(vn => vn.brandId === brandId);
+  }
+  if (vehicleType) {
+    list = list.filter(vn => vn.vehicleType === vehicleType);
+  }
+  res.json(list);
+});
+
+app.post("/api/vehicle-names", (req, res) => {
+  const db = readDb();
+  const { name, brandId, vehicleType } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: "Model name is required" });
+  if (!db.vehicle_names) db.vehicle_names = [...DEFAULT_INITIAL_VEHICLE_NAMES];
+  const newVn = {
+    id: req.body.id || "vn_" + Date.now().toString(36),
+    brandId: brandId || "",
+    name: name.trim(),
+    vehicleType: vehicleType || "Four Wheeler",
+    isDeleted: false,
+    createdBy: req.body.createdBy || "Admin",
+    createdAt: new Date().toISOString()
+  };
+  db.vehicle_names.push(newVn);
+  writeDb(db);
+  res.status(201).json(newVn);
+});
+
+app.put("/api/vehicle-names/:id", (req, res) => {
+  const db = readDb();
+  if (!db.vehicle_names) db.vehicle_names = [...DEFAULT_INITIAL_VEHICLE_NAMES];
+  const index = db.vehicle_names.findIndex(vn => vn.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Vehicle model not found" });
+  db.vehicle_names[index] = {
+    ...db.vehicle_names[index],
+    ...req.body,
+    name: req.body.name ? req.body.name.trim() : db.vehicle_names[index].name
+  };
+  writeDb(db);
+  res.json(db.vehicle_names[index]);
+});
+
+app.delete("/api/vehicle-names/:id", (req, res) => {
+  const db = readDb();
+  if (!db.vehicle_names) db.vehicle_names = [...DEFAULT_INITIAL_VEHICLE_NAMES];
+  const index = db.vehicle_names.findIndex(vn => vn.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Vehicle model not found" });
+  db.vehicle_names[index].isDeleted = true;
+  writeDb(db);
+  res.json({ message: "Vehicle model deleted successfully" });
+});
+
 app.get("/api/suppliers", (req, res) => {
   const db = readDb();
-  const search = (req.query.search || "").toLowerCase().trim();
+  const search = (req.query.search || "").trim();
   const page = parseInt(req.query.page || "1");
   const limit = parseInt(req.query.limit || "10");
-  let filtered = db.suppliers || [];
+  let filtered = (db.suppliers || []).filter(s => !s.isDeleted);
   if (search) {
     filtered = filtered.filter((s) => {
-      const cityName = (db.cities?.find((c) => c.id === s.city_id)?.name || "").toLowerCase();
-      const areaName = (db.areas?.find((a) => a.id === s.area_id)?.name || "").toLowerCase();
-      const subAreaName = (db.sub_areas?.find((sa) => sa.id === s.sub_area_id)?.name || "").toLowerCase();
+      const cityName = (db.cities?.find((c) => c.id === s.city_id)?.name || "");
+      const areaName = (db.areas?.find((a) => a.id === s.area_id)?.name || "");
+      const subAreaName = (db.sub_areas?.find((sa) => sa.id === s.sub_area_id)?.name || "");
       return (
-        (s.supplier_id || "").toLowerCase().includes(search) ||
-        (s.supplier_name || "").toLowerCase().includes(search) ||
-        (s.supplier_mobile || "").includes(search) ||
-        (s.address && s.address.toLowerCase().includes(search)) ||
-        cityName.includes(search) ||
-        areaName.includes(search) ||
-        subAreaName.includes(search)
+        matchSearchQuery(s.supplier_id, search) ||
+        matchSearchQuery(s.id, search) ||
+        matchSearchQuery(s.supplier_name, search) ||
+        matchSearchQuery(s.name, search) ||
+        matchSearchQuery(s.supplier_mobile, search) ||
+        matchSearchQuery(s.mobile, search) ||
+        matchSearchQuery(s.address, search) ||
+        matchSearchQuery(s.gst_number, search) ||
+        matchSearchQuery(cityName, search) ||
+        matchSearchQuery(areaName, search) ||
+        matchSearchQuery(subAreaName, search)
       );
     });
   }
@@ -1130,15 +1316,24 @@ app.delete("/api/suppliers/:id", (req, res) => {
 });
 app.get("/api/customers", (req, res) => {
   const db = readDb();
-  const search = (req.query.search || "").toLowerCase().trim();
+  const search = (req.query.search || "").trim();
   const status = req.query.status || "";
   const type = req.query.type || "";
   const page = parseInt(req.query.page || "1");
   const limit = parseInt(req.query.limit || "10");
-  let filtered = db.customers;
+  let filtered = (db.customers || []).filter(c => !c.isDeleted);
   if (search) {
     filtered = filtered.filter(
-      (c) => c.customer_id.toLowerCase().includes(search) || c.customer_name.toLowerCase().includes(search) || c.customer_mobile.includes(search) || c.address && c.address.toLowerCase().includes(search) || c.aadhaar_number && c.aadhaar_number.includes(search) || c.pan_number && c.pan_number.toLowerCase().includes(search)
+      (c) =>
+        matchSearchQuery(c.customer_id, search) ||
+        matchSearchQuery(c.id, search) ||
+        matchSearchQuery(c.customer_name, search) ||
+        matchSearchQuery(c.name, search) ||
+        matchSearchQuery(c.customer_mobile, search) ||
+        matchSearchQuery(c.mobile, search) ||
+        matchSearchQuery(c.address, search) ||
+        matchSearchQuery(c.aadhaar_number, search) ||
+        matchSearchQuery(c.pan_number, search)
     );
   }
   const fromDate = req.query.fromDate;
@@ -1207,25 +1402,24 @@ app.get("/api/customers/export", (req, res) => {
   res.json(customerData);
 });
 app.post("/api/customers", (req, res) => {
-  const {
-    customer_type,
-    customer_name,
-    customer_mobile,
-    source,
-    aadhaar_number,
-    pan_number,
-    city_id,
-    area_id,
-    sub_area_id,
-    address,
-    customer_photo,
-    aadhaar_photo,
-    pan_photo,
-    customer_status,
-    preferred_vehicle,
-    remarks_notes
-  } = req.body;
-  if (!customer_type || !["Buy", "Sell"].includes(customer_type)) {
+  const customer_type = req.body.customer_type || req.body.type || req.body.requirement || "Buy";
+  const customer_name = req.body.customer_name || req.body.name || "";
+  const customer_mobile = (req.body.customer_mobile || req.body.mobile || "").toString().trim();
+  const source = req.body.source || "Walk In";
+  const aadhaar_number = req.body.aadhaar_number || req.body.aadhaar || "";
+  const pan_number = req.body.pan_number || req.body.pan || "";
+  const city_id = req.body.city_id || req.body.cityId || req.body.city || "";
+  const area_id = req.body.area_id || req.body.areaId || req.body.area || "";
+  const sub_area_id = req.body.sub_area_id || req.body.subAreaId || req.body.subArea || "";
+  const address = req.body.address || "";
+  const customer_photo = req.body.customer_photo || req.body.photo || "";
+  const aadhaar_photo = req.body.aadhaar_photo || "";
+  const pan_photo = req.body.pan_photo || "";
+  const customer_status = req.body.customer_status || req.body.status || req.body.leadStatus || "New Lead";
+  const preferred_vehicle = req.body.preferred_vehicle || req.body.preferredVehicle || "";
+  const remarks_notes = req.body.remarks_notes || req.body.remarks || req.body.notes || "";
+
+  if (!["Buy", "Sell"].includes(customer_type)) {
     return res.status(400).json({ error: "Customer Type must be Buy or Sell" });
   }
   if (!customer_name || customer_name.trim() === "") {
@@ -1234,25 +1428,22 @@ app.post("/api/customers", (req, res) => {
   if (!customer_mobile || !/^\d{10}$/.test(customer_mobile)) {
     return res.status(400).json({ error: "Customer Mobile must be exactly 10 digits" });
   }
-  if (!source || !["Walk In", "Referral", "Online"].includes(source)) {
-    return res.status(400).json({ error: "Source must be: Walk In, Referral, or Online" });
-  }
   if (aadhaar_number && !/^\d{12}$/.test(aadhaar_number)) {
     return res.status(400).json({ error: "Aadhaar Number must be exactly 12 digits" });
   }
   if (pan_number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan_number.toUpperCase())) {
     return res.status(400).json({ error: "PAN Number must match valid format (5 alpha, 4 numeric, 1 alpha)" });
   }
-  if (!customer_status || !["New Lead", "Follow Up", "Converted", "Closed"].includes(customer_status)) {
-    return res.status(400).json({ error: "Invalid Customer Status!" });
-  }
   const db = readDb();
   const customer_id = getNextCustomerId();
   const newCustomer = {
     customer_id,
+    id: customer_id,
     customer_type,
     customer_name: customer_name.trim(),
+    name: customer_name.trim(),
     customer_mobile: customer_mobile.trim(),
+    mobile: customer_mobile.trim(),
     source,
     aadhaar_number: aadhaar_number ? aadhaar_number.trim() : "",
     pan_number: pan_number ? pan_number.trim().toUpperCase() : "",
@@ -1270,31 +1461,39 @@ app.post("/api/customers", (req, res) => {
     updated_at: (/* @__PURE__ */ new Date()).toISOString(),
     branch: req.body.branch || req.headers["x-user-branch"] || "Coimbatore"
   };
+  if (!db.customers) db.customers = [];
   db.customers.unshift(newCustomer);
   writeDb(db);
   res.status(201).json(newCustomer);
 });
 app.put("/api/customers/:id", (req, res) => {
-  const {
-    customer_type,
-    customer_name,
-    customer_mobile,
-    source,
-    aadhaar_number,
-    pan_number,
-    city_id,
-    area_id,
-    sub_area_id,
-    address,
-    customer_photo,
-    aadhaar_photo,
-    pan_photo,
-    customer_status,
-    preferred_vehicle,
-    remarks_notes
-  } = req.body;
   const customer_id = req.params.id;
-  if (!customer_type || !["Buy", "Sell"].includes(customer_type)) {
+  const db = readDb();
+  if (!db.customers) db.customers = [];
+  const index = db.customers.findIndex((c) => c.customer_id === customer_id || c.id === customer_id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+  const existing = db.customers[index];
+
+  const customer_type = req.body.customer_type || req.body.type || req.body.requirement || existing.customer_type || "Buy";
+  const customer_name = req.body.customer_name || req.body.name || existing.customer_name || existing.name || "";
+  const customer_mobile = (req.body.customer_mobile || req.body.mobile || existing.customer_mobile || existing.mobile || "").toString().trim();
+  const source = req.body.source || existing.source || "Walk In";
+  const aadhaar_number = req.body.aadhaar_number !== undefined ? req.body.aadhaar_number : (existing.aadhaar_number || "");
+  const pan_number = req.body.pan_number !== undefined ? req.body.pan_number : (existing.pan_number || "");
+  const city_id = req.body.city_id || req.body.cityId || req.body.city || existing.city_id || "";
+  const area_id = req.body.area_id || req.body.areaId || req.body.area || existing.area_id || "";
+  const sub_area_id = req.body.sub_area_id || req.body.subAreaId || req.body.subArea || existing.sub_area_id || "";
+  const address = req.body.address !== undefined ? req.body.address : (existing.address || "");
+  const customer_photo = req.body.customer_photo !== undefined ? req.body.customer_photo : (existing.customer_photo || "");
+  const aadhaar_photo = req.body.aadhaar_photo !== undefined ? req.body.aadhaar_photo : (existing.aadhaar_photo || "");
+  const pan_photo = req.body.pan_photo !== undefined ? req.body.pan_photo : (existing.pan_photo || "");
+  const customer_status = req.body.customer_status || req.body.status || req.body.leadStatus || existing.customer_status || "New Lead";
+  const preferred_vehicle = req.body.preferred_vehicle !== undefined ? req.body.preferred_vehicle : (existing.preferred_vehicle || "");
+  const remarks_notes = req.body.remarks_notes !== undefined ? req.body.remarks_notes : (existing.remarks_notes || "");
+
+  if (!["Buy", "Sell"].includes(customer_type)) {
     return res.status(400).json({ error: "Customer Type must be Buy or Sell" });
   }
   if (!customer_name || customer_name.trim() === "") {
@@ -1303,28 +1502,19 @@ app.put("/api/customers/:id", (req, res) => {
   if (!customer_mobile || !/^\d{10}$/.test(customer_mobile)) {
     return res.status(400).json({ error: "Customer Mobile must be exactly 10 digits" });
   }
-  if (!source || !["Walk In", "Referral", "Online"].includes(source)) {
-    return res.status(400).json({ error: "Source must be: Walk In, Referral, or Online" });
-  }
   if (aadhaar_number && !/^\d{12}$/.test(aadhaar_number)) {
     return res.status(400).json({ error: "Aadhaar Number must be exactly 12 digits" });
   }
   if (pan_number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan_number.toUpperCase())) {
     return res.status(400).json({ error: "PAN Number must match valid format (e.g. ABCDE1234F)" });
   }
-  if (!customer_status || !["New Lead", "Follow Up", "Converted", "Closed"].includes(customer_status)) {
-    return res.status(400).json({ error: "Invalid Customer Status!" });
-  }
-  const db = readDb();
-  const index = db.customers.findIndex((c) => c.customer_id === customer_id);
-  if (index === -1) {
-    return res.status(404).json({ error: "Customer not found" });
-  }
   const updatedCustomer = {
-    ...db.customers[index],
+    ...existing,
     customer_type,
     customer_name: customer_name.trim(),
+    name: customer_name.trim(),
     customer_mobile: customer_mobile.trim(),
+    mobile: customer_mobile.trim(),
     source,
     aadhaar_number: aadhaar_number ? aadhaar_number.trim() : "",
     pan_number: pan_number ? pan_number.trim().toUpperCase() : "",
@@ -1377,10 +1567,24 @@ app.get("/api/purchases", (req, res) => {
   const db = readDb();
   const purchasesList = db.purchases || [];
   let filtered = purchasesList.filter((p) => !p.isDeleted);
-  const search = typeof req.query.search === "string" ? req.query.search.toLowerCase() : "";
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   if (search) {
     filtered = filtered.filter(
-      (p) => p.purchase_id.toLowerCase().includes(search) || p.reg_no.toLowerCase().includes(search) || p.seller_name.toLowerCase().includes(search) || p.vehicle_name_id.toLowerCase().includes(search) || p.brand_id.toLowerCase().includes(search)
+      (p) =>
+        matchSearchQuery(p.purchase_id, search) ||
+        matchSearchQuery(p.id, search) ||
+        matchSearchQuery(p.purchaseNo, search) ||
+        matchSearchQuery(p.reg_no, search) ||
+        matchSearchQuery(p.regNo, search) ||
+        matchSearchQuery(p.seller_name, search) ||
+        matchSearchQuery(p.seller_id, search) ||
+        matchSearchQuery(p.vehicle_name_id, search) ||
+        matchSearchQuery(p.vehicleName, search) ||
+        matchSearchQuery(p.brand_id, search) ||
+        matchSearchQuery(p.brand, search) ||
+        matchSearchQuery(p.model_details, search) ||
+        matchSearchQuery(p.engine_number, search) ||
+        matchSearchQuery(p.chassis_number, search)
     );
   }
   const fromDate = req.query.fromDate;
@@ -1413,6 +1617,7 @@ app.get("/api/purchases", (req, res) => {
   const totalPages = Math.ceil(totalCount / limit);
   res.json({
     data: paginatedPurchases,
+    allFiltered: filtered,
     pagination: {
       totalCount,
       totalPages,
@@ -1455,6 +1660,7 @@ app.post("/api/purchases", (req, res) => {
     owner_details,
     engine_number,
     chassis_number,
+    rc_available,
     challan_pending,
     noc_available,
     insurance_active,
@@ -1501,7 +1707,7 @@ app.post("/api/purchases", (req, res) => {
   if (!purchase_type || !seller_id || !brand_id || !vehicle_name_id || !reg_no) {
     return res.status(400).json({ error: "Required fields missing: type, seller, brand, vehicle name, registration" });
   }
-  const purchaseId = getNextPurchaseId();
+  const purchaseId = req.body.purchase_id || req.body.id || getNextPurchaseId();
   const pPrice = Number(purchase_price) || 0;
   const aPrice = Number(advance_price) || 0;
   const balance = pPrice - aPrice;
@@ -1528,6 +1734,7 @@ app.post("/api/purchases", (req, res) => {
     owner_details: owner_details || "1st Owner",
     engine_number: engine_number || "",
     chassis_number: chassis_number || "",
+    rc_available: rc_available || "Yes",
     challan_pending: challan_pending || "No",
     noc_available: noc_available || "No",
     insurance_active: insurance_active || "No",
@@ -1640,6 +1847,7 @@ app.put("/api/purchases/:id", (req, res) => {
     owner_details,
     engine_number,
     chassis_number,
+    rc_available,
     challan_pending,
     noc_available,
     insurance_active,
@@ -1709,6 +1917,7 @@ app.put("/api/purchases/:id", (req, res) => {
     owner_details: owner_details || existing.owner_details,
     engine_number: engine_number !== void 0 ? engine_number : existing.engine_number,
     chassis_number: chassis_number !== void 0 ? chassis_number : existing.chassis_number,
+    rc_available: rc_available !== void 0 ? rc_available : (existing.rc_available || "Yes"),
     challan_pending: challan_pending || existing.challan_pending,
     noc_available: noc_available || existing.noc_available,
     insurance_active: insurance_active || existing.insurance_active,
@@ -2199,6 +2408,23 @@ app.delete("/api/ledgers/:id", (req, res) => {
 app.get("/api/loans", (req, res) => {
   const db = readDb();
   let list = (db.loans || []).filter((l) => !l.isDeleted);
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  if (search) {
+    list = list.filter(
+      (l) =>
+        matchSearchQuery(l.id, search) ||
+        matchSearchQuery(l.loan_id, search) ||
+        matchSearchQuery(l.loanNo, search) ||
+        matchSearchQuery(l.customerName, search) ||
+        matchSearchQuery(l.customerId, search) ||
+        matchSearchQuery(l.financeName, search) ||
+        matchSearchQuery(l.bankName, search) ||
+        matchSearchQuery(l.vehicleDetails, search) ||
+        matchSearchQuery(l.regNo, search) ||
+        matchSearchQuery(l.reg_no, search) ||
+        matchSearchQuery(l.mobile, search)
+    );
+  }
   const branch = req.query.branch;
   if (branch && branch !== "all") {
     const cleanB = branch.toLowerCase().replace(/branch/gi, "").trim();
@@ -2582,17 +2808,31 @@ app.post("/api/loans/:id/receipts", (req, res) => {
 });
 
 // Deals/Sales Endpoints
+app.get("/api/deals/nextId", (req, res) => {
+  res.json({ nextId: getNextDealId() });
+});
+
 app.get("/api/deals", (req, res) => {
   const db = readDb();
   if (!db.deals) db.deals = [];
   let filtered = db.deals.filter((d) => !d.isDeleted);
 
-  const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   if (search) {
     filtered = filtered.filter(
-      (d) => (d.id || "").toLowerCase().includes(search) || 
-             (d.customerName || "").toLowerCase().includes(search) || 
-             (d.vehicleName || "").toLowerCase().includes(search)
+      (d) =>
+        matchSearchQuery(d.id, search) ||
+        matchSearchQuery(d.deal_id, search) ||
+        matchSearchQuery(d.sale_id, search) ||
+        matchSearchQuery(d.dealNo, search) ||
+        matchSearchQuery(d.customerName, search) ||
+        matchSearchQuery(d.customer_name, search) ||
+        matchSearchQuery(d.customerId, search) ||
+        matchSearchQuery(d.vehicleName, search) ||
+        matchSearchQuery(d.vehicleDetails, search) ||
+        matchSearchQuery(d.regNo, search) ||
+        matchSearchQuery(d.reg_no, search) ||
+        matchSearchQuery(d.mobile, search)
     );
   }
 
@@ -3358,7 +3598,48 @@ app.put("/api/login-reports/:id/expire", (req, res) => {
   res.status(404).json({ error: "Report not found" });
 });
 
-// Login verification API
+// Session token verification API
+app.get("/api/auth/verify", (req, res) => {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ valid: false, error: "No session token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({ valid: false, error: "Invalid session token" });
+    }
+
+    const db = readDb();
+    const user = (db.users || []).find((u) => u.id === decoded.id && !u.isDeleted);
+    if (!user || user.isActive === false) {
+      return res.status(401).json({ valid: false, error: "User is inactive or not found" });
+    }
+
+    const userPerms = (db.user_permissions || []).filter((p) => p.user_id === user.id);
+    return res.json({
+      valid: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        permissions: user.permissions,
+        detailedPermissions: userPerms,
+        branch: user.branch,
+        branch_id: user.branch_id
+      }
+    });
+  } catch (err) {
+    return res.status(401).json({ valid: false, error: "Session expired or invalid" });
+  }
+});
+
+// Secure Login verification API
 app.post("/api/login", (req, res) => {
   const { username, password, branch } = req.body;
   if (!username || !password) {
@@ -3368,40 +3649,26 @@ app.post("/api/login", (req, res) => {
   const db = readDb();
   if (!db.users) db.users = [];
 
-  // Match by username OR email address OR name case-insensitively
-  let user = db.users.find(
+  const cleanUser = username.toLowerCase().trim();
+
+  // Strict matching by username, email, or exact name
+  const user = db.users.find(
     (u) => !u.isDeleted && (
-      (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
-      (u.email && u.email.toLowerCase() === username.toLowerCase()) ||
-      (u.name && u.name.toLowerCase() === username.toLowerCase())
+      (u.username && u.username.toLowerCase() === cleanUser) ||
+      (u.email && u.email.toLowerCase() === cleanUser) ||
+      (u.name && u.name.toLowerCase() === cleanUser)
     )
   );
-
-  // Fallback: If no direct match, check if requested username refers to admin/super admin
-  if (!user) {
-    const inputClean = username.toLowerCase().trim();
-    if (
-      inputClean.includes("admin") ||
-      inputClean.includes("super") ||
-      inputClean.includes("owner") ||
-      inputClean === "user" ||
-      inputClean === "demo" ||
-      inputClean === "test"
-    ) {
-      user = db.users.find((u) => !u.isDeleted && (u.username.toLowerCase() === "admin" || u.role === "Super Admin"));
-    }
-  }
-
-  // Fallback: If still no user found and db.users has an active super admin user
-  if (!user) {
-    user = db.users.find((u) => !u.isDeleted && u.isActive && (u.username.toLowerCase() === "admin" || u.role === "Super Admin"));
-  }
 
   if (!user) {
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
-  // Password verification using bcryptjs with fallback support for common default credentials
+  if (user.isActive === false) {
+    return res.status(403).json({ error: "Your account is inactive. Please contact Super Admin." });
+  }
+
+  // Password verification strictly using bcrypt comparison or exact match
   let isCorrect = false;
   try {
     if (user.password && (user.password.startsWith("$2a$") || user.password.startsWith("$2b$") || user.password.startsWith("$2y$"))) {
@@ -3413,24 +3680,12 @@ app.post("/api/login", (req, res) => {
     isCorrect = user.password === password;
   }
 
-  // Fallback check for common admin / demo passwords or Super Admin bypass
-  if (!isCorrect) {
-    const commonPasswords = ["Admin@123", "admin", "password", "123456", "admin123", "Admin123", "auto360", "Auto360", "12345678", "demo", "test"];
-    if (commonPasswords.includes(password) || user.role === "Super Admin") {
-      isCorrect = true;
-    }
-  }
-
   if (!isCorrect) {
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
-  if (user.isActive === false) {
-    return res.status(403).json({ error: "Your account is inactive. Please contact Super Admin." });
-  }
-
   // Branch routing verification unless Super Admin
-  if (user.role !== "Super Admin" && branch) {
+  if (user.role !== "Super Admin" && branch && branch !== "All Branches") {
     const selectedBranchClean = branch.toLowerCase().replace(/branch/gi, "").trim();
     const userBranchClean = (user.branch || "").toLowerCase().replace(/branch/gi, "").trim();
     const userBranchIdClean = (user.branch_id || "").toLowerCase().trim();
@@ -3453,7 +3708,7 @@ app.post("/api/login", (req, res) => {
       branch: user.branch
     },
     JWT_SECRET,
-    { expiresIn: "2h" }
+    { expiresIn: "8h" }
   );
 
   // Returns session token and user profile details
@@ -3658,40 +3913,48 @@ app.delete("/api/staff/:id", (req, res) => {
 // Implementation of Unified Global Search API
 app.get("/api/search", (req, res) => {
   const db = readDb();
-  const q = (req.query.q || "").toLowerCase().trim();
-  const branch = req.query.branch || req.query.user_branch;
-  const cleanB = branch && branch !== "all" ? branch.toLowerCase().replace(/branch/gi, "").trim() : null;
+  const q = (req.query.q || "").trim();
+  const branch = req.query.branch;
+  const cleanB = branch && branch !== "all" && branch.trim() !== "" ? branch.toLowerCase().replace(/branch/gi, "").trim() : null;
 
   if (!q) {
     return res.json({ customers: [], purchases: [], sales: [], loans: [], suppliers: [] });
   }
 
-  // Branch filter helper
-  const matchBranch = (item, defaultB = "coimbatore") => {
+  // Branch filter helper: don't exclude records with no branch or when cleanB is not set
+  const matchBranch = (item) => {
     if (!cleanB) return true;
-    const itemBranch = (item.branch || defaultB).toLowerCase().replace(/branch/gi, "").trim();
-    return itemBranch.includes(cleanB);
+    if (!item.branch) return true;
+    const itemBranch = item.branch.toLowerCase().replace(/branch/gi, "").trim();
+    return itemBranch.includes(cleanB) || cleanB.includes(itemBranch);
   };
 
   // 1. Query Customers
   const matchedCustomers = (db.customers || []).filter(c => {
     if (c.isDeleted) return false;
-    if (!matchBranch(c, "coimbatore")) return false;
+    if (!matchBranch(c)) return false;
     return (
-      (c.customer_id || "").toLowerCase().includes(q) ||
-      (c.customer_name || "").toLowerCase().includes(q) ||
-      (c.customer_mobile || "").includes(q) ||
-      (c.address || "").toLowerCase().includes(q)
+      matchSearchQuery(c.customer_id, q) ||
+      matchSearchQuery(c.id, q) ||
+      matchSearchQuery(c.customer_name, q) ||
+      matchSearchQuery(c.name, q) ||
+      matchSearchQuery(c.customer_mobile, q) ||
+      matchSearchQuery(c.mobile, q) ||
+      matchSearchQuery(c.address, q) ||
+      matchSearchQuery(c.aadhaar_number, q) ||
+      matchSearchQuery(c.pan_number, q)
     );
-  }).slice(0, 15).map(c => {
-    const pCount = (db.purchases || []).filter(p => p.seller_id === c.customer_id && !p.isDeleted).length;
-    const sCount = (db.deals || []).filter(d => d.customerId === c.customer_id && !d.isDeleted).length;
-    const city = (db.cities || []).find(ci => ci.id === c.city_id)?.name || "N/A";
+  }).slice(0, 25).map(c => {
+    const pCount = (db.purchases || []).filter(p => (p.seller_id === c.customer_id || p.seller_id === c.id) && !p.isDeleted).length;
+    const sCount = (db.deals || []).filter(d => (d.customerId === c.customer_id || d.customerId === c.id) && !d.isDeleted).length;
+    const city = (db.cities || []).find(ci => ci.id === c.city_id)?.name || c.city || "N/A";
     return {
       ...c,
-      id: c.customer_id,
-      name: c.customer_name,
-      mobile: c.customer_mobile,
+      id: c.customer_id || c.id,
+      customer_id: c.customer_id || c.id,
+      name: c.customer_name || c.name,
+      customer_name: c.customer_name || c.name,
+      mobile: c.customer_mobile || c.mobile,
       city,
       purchase_count: pCount,
       sales_count: sCount
@@ -3701,82 +3964,115 @@ app.get("/api/search", (req, res) => {
   // 2. Query Purchases (Vehicles)
   const matchedPurchases = (db.purchases || []).filter(p => {
     if (p.isDeleted) return false;
-    if (!matchBranch(p, "coimbatore")) return false;
+    if (!matchBranch(p)) return false;
     return (
-      (p.purchase_id || "").toLowerCase().includes(q) ||
-      (p.reg_no || "").toLowerCase().includes(q) ||
-      (p.vehicle_name_id || "").toLowerCase().includes(q) ||
-      (p.brand_id || "").toLowerCase().includes(q) ||
-      (p.seller_name || "").toLowerCase().includes(q)
+      matchSearchQuery(p.purchase_id, q) ||
+      matchSearchQuery(p.id, q) ||
+      matchSearchQuery(p.purchaseNo, q) ||
+      matchSearchQuery(p.reg_no, q) ||
+      matchSearchQuery(p.regNo, q) ||
+      matchSearchQuery(p.vehicle_name_id, q) ||
+      matchSearchQuery(p.vehicleName, q) ||
+      matchSearchQuery(p.model_details, q) ||
+      matchSearchQuery(p.brand_id, q) ||
+      matchSearchQuery(p.brand, q) ||
+      matchSearchQuery(p.seller_name, q) ||
+      matchSearchQuery(p.seller_id, q) ||
+      matchSearchQuery(p.engine_number, q) ||
+      matchSearchQuery(p.chassis_number, q)
     );
-  }).slice(0, 15).map(p => {
+  }).slice(0, 25).map(p => {
+    const brandName = p.brand_id || p.brand || "";
+    const modelName = p.vehicle_name_id || p.vehicleName || "";
     return {
       ...p,
-      id: p.purchase_id,
-      vehicleDetails: `${p.brand_id} ${p.vehicle_name_id}`,
-      amount: p.purchase_price,
-      supplier: p.seller_name,
-      status: p.status
+      id: p.purchase_id || p.id,
+      purchase_id: p.purchase_id || p.id,
+      vehicleDetails: `${brandName} ${modelName}`.trim() || p.model_details || "Vehicle",
+      amount: p.purchase_price || p.purchasePrice || 0,
+      supplier: p.seller_name || "N/A",
+      status: p.status || "Available"
     };
   });
 
   // 3. Query Sales (Deals)
   const matchedSales = (db.deals || []).filter(d => {
     if (d.isDeleted) return false;
-    if (!matchBranch(d, "coimbatore")) return false;
+    if (!matchBranch(d)) return false;
     return (
-      (d.id || "").toLowerCase().includes(q) ||
-      (d.customerName || "").toLowerCase().includes(q) ||
-      (d.vehicleName || "").toLowerCase().includes(q)
+      matchSearchQuery(d.id, q) ||
+      matchSearchQuery(d.deal_id, q) ||
+      matchSearchQuery(d.sale_id, q) ||
+      matchSearchQuery(d.dealNo, q) ||
+      matchSearchQuery(d.customerName, q) ||
+      matchSearchQuery(d.customer_name, q) ||
+      matchSearchQuery(d.customerId, q) ||
+      matchSearchQuery(d.vehicleName, q) ||
+      matchSearchQuery(d.vehicleDetails, q) ||
+      matchSearchQuery(d.regNo, q) ||
+      matchSearchQuery(d.reg_no, q) ||
+      matchSearchQuery(d.mobile, q)
     );
-  }).slice(0, 15).map(d => {
+  }).slice(0, 25).map(d => {
     return {
       ...d,
-      id: d.id,
-      customer: d.customerName,
-      vehicle: d.vehicleName,
-      amount: d.totalPrice
+      id: d.id || d.deal_id,
+      customer: d.customerName || d.customer_name || "N/A",
+      vehicle: d.vehicleName || d.vehicleDetails || "N/A",
+      amount: d.totalPrice || d.sellingPrice || 0
     };
   });
 
   // 4. Query Loans
   const matchedLoans = (db.loans || []).filter(l => {
     if (l.isDeleted) return false;
-    if (!matchBranch(l, "coimbatore")) return false;
+    if (!matchBranch(l)) return false;
     return (
-      (l.id || "").toLowerCase().includes(q) ||
-      (l.customerName || "").toLowerCase().includes(q) ||
-      (l.financeName || "").toLowerCase().includes(q) ||
-      (l.vehicleDetails || "").toLowerCase().includes(q) ||
-      (l.regNo || "").toLowerCase().includes(q)
+      matchSearchQuery(l.id, q) ||
+      matchSearchQuery(l.loan_id, q) ||
+      matchSearchQuery(l.loanNo, q) ||
+      matchSearchQuery(l.customerName, q) ||
+      matchSearchQuery(l.customerId, q) ||
+      matchSearchQuery(l.financeName, q) ||
+      matchSearchQuery(l.bankName, q) ||
+      matchSearchQuery(l.vehicleDetails, q) ||
+      matchSearchQuery(l.regNo, q) ||
+      matchSearchQuery(l.reg_no, q) ||
+      matchSearchQuery(l.mobile, q)
     );
-  }).slice(0, 15).map(l => {
+  }).slice(0, 25).map(l => {
     return {
       ...l,
-      financeName: l.financeName || "Direct",
-      loanAmount: l.takenAmount,
-      balanceAmount: l.dueAmount
+      id: l.id || l.loan_id,
+      financeName: l.financeName || l.bankName || "Direct",
+      loanAmount: l.takenAmount || l.loanAmount || 0,
+      balanceAmount: l.dueAmount || l.balanceAmount || 0
     };
   });
 
   // 5. Query Suppliers
   const matchedSuppliers = (db.suppliers || []).filter(s => {
     if (s.isDeleted) return false;
-    if (!matchBranch(s, "salem")) return false;
+    if (!matchBranch(s)) return false;
     return (
-      (s.supplier_id || "").toLowerCase().includes(q) ||
-      (s.supplier_name || "").toLowerCase().includes(q) ||
-      (s.supplier_mobile || "").includes(q) ||
-      (s.address || "").toLowerCase().includes(q)
+      matchSearchQuery(s.supplier_id, q) ||
+      matchSearchQuery(s.id, q) ||
+      matchSearchQuery(s.supplier_name, q) ||
+      matchSearchQuery(s.name, q) ||
+      matchSearchQuery(s.supplier_mobile, q) ||
+      matchSearchQuery(s.mobile, q) ||
+      matchSearchQuery(s.address, q) ||
+      matchSearchQuery(s.gst_number, q)
     );
-  }).slice(0, 15).map(s => {
-    const vCount = (db.purchases || []).filter(p => p.seller_id === s.supplier_id && !p.isDeleted).length;
-    const city = (db.cities || []).find(ci => ci.id === s.city_id)?.name || "N/A";
+  }).slice(0, 25).map(s => {
+    const vCount = (db.purchases || []).filter(p => (p.seller_id === s.supplier_id || p.seller_id === s.id) && !p.isDeleted).length;
+    const city = (db.cities || []).find(ci => ci.id === s.city_id)?.name || s.city || "N/A";
     return {
       ...s,
-      id: s.supplier_id,
-      name: s.supplier_name,
-      mobile: s.supplier_mobile,
+      id: s.supplier_id || s.id,
+      supplier_id: s.supplier_id || s.id,
+      name: s.supplier_name || s.name,
+      mobile: s.supplier_mobile || s.mobile,
       city,
       vehicle_count: vCount
     };

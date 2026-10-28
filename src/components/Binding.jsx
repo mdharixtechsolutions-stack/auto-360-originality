@@ -20,11 +20,22 @@ import { cn } from "../lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { hasModulePermission } from "../lib/permissions";
-export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, onNavigate, currentUser, selectedBranch, businessProfile, onRefreshData }) {
+export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, initialSearch, onNavigate, currentUser, selectedBranch, businessProfile, onRefreshData }) {
   const [loans, setLoans] = useState([]);
   const [allLoans, setAllLoans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch || "");
+
+  useEffect(() => {
+    if (initialSearch !== undefined && initialSearch !== "") {
+      setSearchQuery(initialSearch);
+      setActiveTab("all");
+      setFromDate("");
+      setToDate("");
+      setLocalFrom("");
+      setLocalTo("");
+    }
+  }, [initialSearch]);
   const [localFrom, setLocalFrom] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
   const [localTo, setLocalTo] = useState(() => localStorage.getItem("financialYearTo") || "2026-03-31");
   const [fromDate, setFromDate] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
@@ -130,7 +141,25 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
   }, [loans]);
   const filteredLoans = useMemo(() => {
     return loans.filter((l) => {
-      const matchesSearch = (l.customerName || "").toLowerCase().includes(searchQuery.toLowerCase()) || (l.regNo || "").toLowerCase().includes(searchQuery.toLowerCase()) || (l.financeName || "").toLowerCase().includes(searchQuery.toLowerCase()) || (l.vehicleDetails || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const q = (searchQuery || "").toLowerCase().trim();
+      const cleanQ = q.replace(/[^a-z0-9]/gi, "");
+      const lId = String(l.id || l.loan_id || "").toLowerCase();
+      const cleanId = lId.replace(/[^a-z0-9]/gi, "");
+      const cName = String(l.customerName || "").toLowerCase();
+      const rNo = String(l.regNo || "").toLowerCase();
+      const cleanReg = rNo.replace(/[^a-z0-9]/gi, "");
+      const fName = String(l.financeName || "").toLowerCase();
+      const vDet = String(l.vehicleDetails || "").toLowerCase();
+      const cleanVDet = vDet.replace(/[^a-z0-9]/gi, "");
+
+      const matchesSearch = !q ||
+        lId.includes(q) ||
+        cName.includes(q) ||
+        rNo.includes(q) ||
+        fName.includes(q) ||
+        vDet.includes(q) ||
+        (cleanQ && (cleanId.includes(cleanQ) || cleanReg.includes(cleanQ) || cleanVDet.includes(cleanQ)));
+
       const matchesTab = activeTab === "all" || activeTab === "vehicle" && l.loanType === "Vehicle Loan" || activeTab === "direct" && l.loanType === "Direct Loan";
       const isWithinFrom = fromDate ? l.loanDate >= fromDate : true;
       const isWithinTo = toDate ? l.loanDate <= toDate : true;
@@ -161,7 +190,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
       vehicleDetails: resolvedVehicleDetails,
       regNo: resolvedRegNo,
       dueAmount: formData.dueAmount || formData.takenAmount,
-      branch: currentUser?.branch || "Coimbatore"
+      branch: currentUser?.branch || "Tiruppur"
     };
     try {
       const res = await fetch("/api/loans", {
@@ -280,7 +309,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
       const textStartX = hasLogo ? 43 : 20;
 
       // Company Name
-      const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+      const compName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
       doc.setFontSize(16);
       doc.setTextColor(30, 41, 59);
       doc.text(compName.toUpperCase(), textStartX, 16);
@@ -415,7 +444,7 @@ export default function Binding({ vehicles, onUpdateVehicle, initialPurchase, on
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(120);
-      doc.text(`Generated via ${businessProfile?.companyName || "Auto360 Consultancy"} Enterprise ERP`, 120, sigY + 4);
+      doc.text(`Generated via ${businessProfile?.companyName || "Auto 360 Consultancy"} Enterprise ERP`, 120, sigY + 4);
 
       doc.save(`LOAN_RECEIPT_SUMMARY_${loan.id}.pdf`);
     };

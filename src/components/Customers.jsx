@@ -27,6 +27,7 @@ import { cn } from "../lib/utils";
 import { calculateCustomerTotalStats, calculateDealSalesOutstanding, calculateVehiclePurchaseOutstanding } from "../lib/outstandingCalculator";
 import { generateCustomerReceiptPDF } from "../lib/receiptPdf";
 import { hasModulePermission } from "../lib/permissions";
+import CustomerFormModal from "./CustomerFormModal";
 
 export default function Customers({
   currentUser,
@@ -203,66 +204,38 @@ export default function Customers({
       setFormId("CUS001");
     }
   };
-  const handleOpenAddModal = async () => {
+  const handleOpenAddModal = () => {
     setEditingCustomer(null);
-    setFormErrors({});
-    setUploadError(null);
-    setFormType("Buy");
-    await fetchNextId();
-    setFormName("");
-    setFormMobile("");
-    setFormSource("Walk In");
-    setFormAadhaar("");
-    setFormPan("");
-    setFormCityId("");
-    setFormAreaId("");
-    setFormSubAreaId("");
-    setFormAddress("");
-    setFormStatus("New Lead");
-    setFormPreferredVehicle("");
-    setFormRemarks("");
-    setPhotoUrl("");
-    setAadhaarPhotoUrl("");
-    setPanPhotoUrl("");
     setShowFormModal(true);
   };
-  const handleOpenEditModal = async (customer) => {
+  const handleOpenEditModal = (customer) => {
     setEditingCustomer(customer);
-    setFormErrors({});
-    setUploadError(null);
-    setFormId(customer.customer_id);
-    setFormType(customer.customer_type);
-    setFormName(customer.customer_name);
-    setFormMobile(customer.customer_mobile);
-    setFormSource(customer.source);
-    setFormAadhaar(customer.aadhaar_number || "");
-    setFormPan(customer.pan_number || "");
-    setFormCityId(customer.city_id || "");
-    if (customer.city_id) {
-      await fetchAreasForCity(customer.city_id);
-    }
-    setFormAreaId(customer.area_id || "");
-    if (customer.area_id) {
-      await fetchSubAreasForArea(customer.area_id);
-    }
-    setFormSubAreaId(customer.sub_area_id || "");
-    setFormAddress(customer.address || "");
-    setFormStatus(customer.customer_status);
-    setFormPreferredVehicle(customer.preferred_vehicle || "");
-    setFormRemarks(customer.remarks_notes || "");
-    setPhotoUrl(customer.customer_photo || "");
-    setAadhaarPhotoUrl(customer.aadhaar_photo || "");
-    setPanPhotoUrl(customer.pan_photo || "");
     setShowFormModal(true);
   };
   const handleViewDetails = (customer) => {
     setSelectedCustomer(customer);
-    const custDeals = deals.filter(
-      (d) => !d.isDeleted && (d.customerId === customer.id || d.customerId === customer.customer_id || d.customerName === customer.customer_name || d.customerName === customer.name)
-    );
-    const custPurchases = purchases.filter(
-      (v) => !v.isDeleted && (v.sellerType === "Customer" || v.purchase_type === "Customer") && (v.sellerId === customer.id || v.seller_id === customer.customer_id || v.sellerName === customer.customer_name || v.sellerName === customer.name)
-    );
+    const cId = customer.id || customer.customer_id;
+    const cName = (customer.customer_name || customer.name || "").trim().toLowerCase();
+    const cMobile = (customer.mobile || customer.customer_mobile || "").trim();
+
+    const custDeals = deals.filter((d) => {
+      if (d.isDeleted) return false;
+      const matchId = cId && (d.customerId === cId || d.customerId === customer.customer_id);
+      const matchName = cName && d.customerName && d.customerName.trim().toLowerCase() === cName;
+      const matchMobile = cMobile && ((d.customerMobile || d.mobile || "").trim() === cMobile);
+      return Boolean(matchId || matchName || matchMobile);
+    });
+
+    const custPurchases = purchases.filter((v) => {
+      if (v.isDeleted) return false;
+      const isCustSourced = v.sellerType === "Customer" || v.purchase_type === "Customer";
+      if (!isCustSourced) return false;
+      const matchId = cId && (v.sellerId === cId || v.seller_id === cId || v.supplier_id === cId);
+      const matchName = cName && ((v.sellerName && v.sellerName.trim().toLowerCase() === cName) || (v.customerName && v.customerName.trim().toLowerCase() === cName));
+      const matchMobile = cMobile && ((v.sellerMobile || v.seller_mobile || v.mobile || "").trim() === cMobile);
+      return Boolean(matchId || matchName || matchMobile);
+    });
+
     if ((customer.customer_type === "Sell" || customer.requirement === "Sell") && custPurchases.length > 0 && custDeals.length === 0) {
       setDetailTab("purchases");
     } else {
@@ -803,12 +776,27 @@ export default function Customers({
       <AnimatePresence>
         {showDetailModal && selectedCustomer && (() => {
           const stats = calculateCustomerTotalStats(selectedCustomer, purchases, deals, payments, vouchers);
-          const custDeals = deals.filter(
-            (d) => !d.isDeleted && (d.customerId === selectedCustomer.id || d.customerId === selectedCustomer.customer_id || d.customerName === selectedCustomer.customer_name || d.customerName === selectedCustomer.name)
-          );
-          const custPurchases = purchases.filter(
-            (v) => !v.isDeleted && (v.sellerType === "Customer" || v.purchase_type === "Customer") && (v.sellerId === selectedCustomer.id || v.seller_id === selectedCustomer.customer_id || v.sellerName === selectedCustomer.customer_name || v.sellerName === selectedCustomer.name)
-          );
+          const cId = selectedCustomer.id || selectedCustomer.customer_id;
+          const cName = (selectedCustomer.customer_name || selectedCustomer.name || "").trim().toLowerCase();
+          const cMobile = (selectedCustomer.mobile || selectedCustomer.customer_mobile || "").trim();
+
+          const custDeals = deals.filter((d) => {
+            if (d.isDeleted) return false;
+            const matchId = cId && (d.customerId === cId || d.customerId === selectedCustomer.customer_id);
+            const matchName = cName && d.customerName && d.customerName.trim().toLowerCase() === cName;
+            const matchMobile = cMobile && ((d.customerMobile || d.mobile || "").trim() === cMobile);
+            return Boolean(matchId || matchName || matchMobile);
+          });
+
+          const custPurchases = purchases.filter((v) => {
+            if (v.isDeleted) return false;
+            const isCustSourced = v.sellerType === "Customer" || v.purchase_type === "Customer";
+            if (!isCustSourced) return false;
+            const matchId = cId && (v.sellerId === cId || v.seller_id === cId || v.supplier_id === cId);
+            const matchName = cName && ((v.sellerName && v.sellerName.trim().toLowerCase() === cName) || (v.customerName && v.customerName.trim().toLowerCase() === cName));
+            const matchMobile = cMobile && ((v.sellerMobile || v.seller_mobile || v.mobile || "").trim() === cMobile);
+            return Boolean(matchId || matchName || matchMobile);
+          });
 
           const isAdvanceEntry = (item) => {
             if (!item) return false;
@@ -929,46 +917,73 @@ export default function Customers({
                   </div>
 
                   {/* Context Dual Profile Tabs (Sales / Buyer vs Purchases / Seller) */}
-                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                    <button
-                      type="button"
-                      onClick={() => setDetailTab("sales")}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border outline-none",
-                        detailTab === "sales"
-                          ? "bg-brand-600 text-white border-brand-600 shadow-sm"
-                          : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-                      )}
-                    >
-                      <Handshake size={15} />
-                      <span>Sales Deals (Buyer Context)</span>
-                      <span className={cn(
-                        "px-1.5 py-0.5 rounded-full text-[10px] font-black",
-                        detailTab === "sales" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
-                      )}>
-                        {custDeals.length}
-                      </span>
-                    </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDetailTab("sales")}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border outline-none",
+                          detailTab === "sales"
+                            ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        )}
+                      >
+                        <Handshake size={15} />
+                        <span>Sales Deals (Buyer Context)</span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                          detailTab === "sales" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                        )}>
+                          {custDeals.length}
+                        </span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setDetailTab("purchases")}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border outline-none",
-                        detailTab === "purchases"
-                          ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                          : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-                      )}
-                    >
-                      <Car size={15} />
-                      <span>Sourced Purchases (Seller Context)</span>
-                      <span className={cn(
-                        "px-1.5 py-0.5 rounded-full text-[10px] font-black",
-                        detailTab === "purchases" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
-                      )}>
-                        {custPurchases.length}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setDetailTab("purchases")}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border outline-none",
+                          detailTab === "purchases"
+                            ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        )}
+                      >
+                        <Car size={15} />
+                        <span>Sourced Purchases (Seller Context)</span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                          detailTab === "purchases" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                        )}>
+                          {custPurchases.length}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          if (onNavigate) onNavigate("purchase", { initialCustomer: selectedCustomer });
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-extrabold hover:bg-amber-100 transition-all"
+                      >
+                        <PlusCircle size={14} />
+                        <span>New Purchase Entry</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          if (onNavigate) onNavigate("sales", { initialCustomer: selectedCustomer });
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-extrabold hover:bg-emerald-100 transition-all"
+                      >
+                        <PlusCircle size={14} />
+                        <span>New Sales Deal</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Customer Financial Metrics Box - STRICTLY ISOLATED BY ACTIVE TAB */}
@@ -1292,368 +1307,17 @@ export default function Customers({
         })()}
       </AnimatePresence>
 
-      {
-    /* Add & Edit Customer Form Modals */
-  }
-      <AnimatePresence>
-        {showFormModal && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4 my-auto">
-            <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    onClick={() => setShowFormModal(false)}
-    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-  />
-            <motion.div
-    initial={{ opacity: 0, scale: 0.95, y: 15 }}
-    animate={{ opacity: 1, scale: 1, y: 0 }}
-    exit={{ opacity: 0, scale: 0.95, y: 15 }}
-    className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-  >
-              <div className="p-6 border-b border-slate-100 bg-slate-50/75 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">
-                    {editingCustomer ? "Edit Customer Settings" : "Register New Customer Lead"}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-sans mt-0.5">Please ensure values match verified IDs</p>
-                </div>
-                <button type="button" onClick={() => setShowFormModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="p-6 overflow-y-auto space-y-6 flex-1">
-                {uploadError && <div className="p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-lg flex items-center gap-2">
-                    <AlertCircle size={16} />
-                    <span>{uploadError}</span>
-                  </div>}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Customer ID</label>
-                    <input
-    type="text"
-    value={formId}
-    disabled
-    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 font-mono font-bold leading-5 rounded-xl cursor-not-allowed outline-none text-sm"
-  />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Customer Focus / Type</label>
-                    <select
-    value={formType}
-    onChange={(e) => setFormType(e.target.value)}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
-  >
-                      <option value="Buy">Seeking to Buy</option>
-                      <option value="Sell">Seeking to Sell</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Full Name <span className="text-rose-500">*</span></label>
-                    <input
-    type="text"
-    value={formName}
-    onChange={(e) => setFormName(e.target.value)}
-    placeholder="e.g. Anand Kumar"
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
-                    {formErrors.name && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.name}</p>}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">10-Digit Mobile Phone <span className="text-rose-500">*</span></label>
-                    <input
-    type="tel"
-    value={formMobile}
-    maxLength={10}
-    onChange={(e) => setFormMobile(e.target.value.replace(/\D/g, ""))}
-    placeholder="e.g. 9845012345"
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-sans"
-  />
-                    {formErrors.mobile && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.mobile}</p>}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Lead Status</label>
-                    <select
-    value={formStatus}
-    onChange={(e) => setFormStatus(e.target.value)}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-500 outline-none shadow-sm"
-  >
-                      <option value="New Lead">New Lead</option>
-                      <option value="Follow Up">Follow Up</option>
-                      <option value="Converted">Converted</option>
-                      <option value="Closed">Closed</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Acquisition Source</label>
-                    <select
-    value={formSource}
-    onChange={(e) => setFormSource(e.target.value)}
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-brand-500 outline-none"
-  >
-                      <option value="Walk In">Walk In</option>
-                      <option value="Referral">Referral</option>
-                      <option value="Online">Online</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Aadhaar Card Number (12 Digits)</label>
-                    <input
-    type="text"
-    value={formAadhaar}
-    maxLength={12}
-    onChange={(e) => setFormAadhaar(e.target.value.replace(/\D/g, ""))}
-    placeholder="e.g. 560012349012"
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-mono"
-  />
-                    {formErrors.aadhaar && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.aadhaar}</p>}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">PAN ID Number (Format: ABCDE1234F)</label>
-                    <input
-    type="text"
-    value={formPan}
-    maxLength={10}
-    onChange={(e) => setFormPan(e.target.value.toUpperCase())}
-    placeholder="e.g. ABCDE1234F"
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-mono"
-  />
-                    {formErrors.pan && <p className="text-rose-600 text-xs font-semibold leading-relaxed mt-1 flex items-center gap-1"><AlertCircle size={12} /> {formErrors.pan}</p>}
-                  </div>
-                </div>
-
-                {
-    /* Dependent Dropdowns */
-  }
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
-                  <h4 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Dependent Locations Master</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">Select City</label>
-                      <select
-    value={formCityId}
-    onChange={(e) => setFormCityId(e.target.value)}
-    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-brand-500"
-  >
-                        <option value="">-- Choose City --</option>
-                        {cities.map((ci) => <option key={ci.id} value={ci.id}>{ci.name}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">Dependent Area</label>
-                      <select
-    value={formAreaId}
-    onChange={(e) => setFormAreaId(e.target.value)}
-    disabled={!formCityId}
-    className="w-full px-3 py-2 bg-white border border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-brand-500"
-  >
-                        <option value="">-- Select Area --</option>
-                        {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">Dependent Sub Area</label>
-                      <select
-    value={formSubAreaId}
-    onChange={(e) => setFormSubAreaId(e.target.value)}
-    disabled={!formAreaId}
-    className="w-full px-3 py-2 bg-white border border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-brand-500"
-  >
-                        <option value="">-- Select Sub Area --</option>
-                        {subAreas.map((sa) => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Preferred Vehicle / Models</label>
-                  <input
-    type="text"
-    value={formPreferredVehicle}
-    onChange={(e) => setFormPreferredVehicle(e.target.value)}
-    placeholder="e.g. Maruti Suzuki WagonR, Swift, Commercial Goods carrier"
-    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800"
-  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Residential Address</label>
-                  <textarea
-    rows={2}
-    value={formAddress}
-    onChange={(e) => setFormAddress(e.target.value)}
-    placeholder="Enter permanent house street, locality etc..."
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-sans"
-  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Remarks / Follow-up Notes</label>
-                  <textarea
-    rows={2}
-    value={formRemarks}
-    onChange={(e) => setFormRemarks(e.target.value)}
-    placeholder="Enter any additional requirements, exchange details, notes..."
-    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm text-slate-800 font-sans"
-  />
-                </div>
-
-                {
-    /* Drag / Click Image Upload section */
-  }
-                <div className="space-y-3">
-                  <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Verify Documents & Image Attachments (Max 5MB)</label>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {
-    /* Customer Photo Upload Widget */
-  }
-                    <div className="border border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50/50 space-y-3 text-center transition-all">
-                      <p className="text-xs font-bold text-slate-700">Customer Photo</p>
-                      {photoUrl ? <div className="relative">
-                          <img
-    src={photoUrl}
-    alt="Preview"
-    referrerPolicy="no-referrer"
-    className="w-20 h-20 rounded-full object-cover border"
-  />
-                          <button
-    type="button"
-    onClick={() => setPhotoUrl("")}
-    className="absolute -top-1 -right-1 bg-rose-600 text-white p-1 rounded-full shadow-lg cursor-pointer"
-  >
-                            <X size={10} />
-                          </button>
-                        </div> : <div
-    onClick={() => photoInputRef.current?.click()}
-    className="w-12 h-12 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer text-slate-500 transition-colors"
-  >
-                          <Upload size={18} />
-                        </div>}
-                      {!photoUrl && <span className="text-[10px] text-slate-400">Click to upload avatar</span>}
-                      <input
-    type="file"
-    ref={photoInputRef}
-    className="hidden"
-    accept=".png,.jpg,.jpeg"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file) handleFileUpload("photo", file);
-    }}
-  />
-                    </div>
-
-                    {
-    /* Aadhaar Photo Upload Widget */
-  }
-                    <div className="border border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50/50 space-y-3 text-center transition-all">
-                      <p className="text-xs font-bold text-slate-700">Aadhaar Card Image</p>
-                      {aadhaarPhotoUrl ? <div className="relative">
-                          <img
-    src={aadhaarPhotoUrl}
-    alt="Preview"
-    referrerPolicy="no-referrer"
-    className="w-20 h-14 rounded-lg object-cover border"
-  />
-                          <button
-    type="button"
-    onClick={() => setAadhaarPhotoUrl("")}
-    className="absolute -top-1 -right-1 bg-rose-600 text-white p-1 rounded-full shadow-lg cursor-pointer"
-  >
-                            <X size={10} />
-                          </button>
-                        </div> : <div
-    onClick={() => aadhaarInputRef.current?.click()}
-    className="w-12 h-12 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer text-slate-500 transition-colors"
-  >
-                          <Upload size={18} />
-                        </div>}
-                      {!aadhaarPhotoUrl && <span className="text-[10px] text-slate-400">Click to upload card</span>}
-                      <input
-    type="file"
-    ref={aadhaarInputRef}
-    className="hidden"
-    accept=".png,.jpg,.jpeg"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file) handleFileUpload("aadhaar", file);
-    }}
-  />
-                    </div>
-
-                    {
-    /* PAN Photo Upload Widget */
-  }
-                    <div className="border border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50/50 space-y-3 text-center transition-all">
-                      <p className="text-xs font-bold text-slate-700">PAN Card Image</p>
-                      {panPhotoUrl ? <div className="relative">
-                          <img
-    src={panPhotoUrl}
-    alt="Preview"
-    referrerPolicy="no-referrer"
-    className="w-20 h-14 rounded-lg object-cover border"
-  />
-                          <button
-    type="button"
-    onClick={() => setPanPhotoUrl("")}
-    className="absolute -top-1 -right-1 bg-rose-600 text-white p-1 rounded-full shadow-lg cursor-pointer"
-  >
-                            <X size={10} />
-                          </button>
-                        </div> : <div
-    onClick={() => panInputRef.current?.click()}
-    className="w-12 h-12 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer text-slate-500 transition-colors"
-  >
-                          <Upload size={18} />
-                        </div>}
-                      {!panPhotoUrl && <span className="text-[10px] text-slate-400">Click to upload card</span>}
-                      <input
-    type="file"
-    ref={panInputRef}
-    className="hidden"
-    accept=".png,.jpg,.jpeg"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file) handleFileUpload("pan", file);
-    }}
-  />
-                    </div>
-
-                  </div>
-                </div>
-
-              </div>
-
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button
-    type="button"
-    onClick={() => setShowFormModal(false)}
-    className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all cursor-pointer outline-none"
-  >
-                  Cancel
-                </button>
-                <button
-    type="button"
-    onClick={handleSaveCustomer}
-    className="px-6 py-2.5 text-sm font-bold bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 cursor-pointer outline-none"
-  >
-                  {editingCustomer ? "Update Profile" : "Save Lead"}
-                </button>
-              </div>
-            </motion.div>
-          </div>}
-      </AnimatePresence>
+      {/* Add & Edit Customer Form Modals */}
+      <CustomerFormModal
+        isOpen={showFormModal}
+        onClose={() => setShowFormModal(false)}
+        editingCustomer={editingCustomer}
+        currentUser={currentUser}
+        onSuccess={() => {
+          fetchCustomers();
+          if (onRefreshData) onRefreshData();
+        }}
+      />
 
       {
     /* Global Delete Confirmation Dialog Box */

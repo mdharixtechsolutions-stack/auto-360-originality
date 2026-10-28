@@ -239,13 +239,15 @@ export function calculateCustomerTotalStats(customer, purchases = [], deals = []
 
   const cId = customer.id || customer.customer_id;
   const cName = (customer.customer_name || customer.name || "").trim().toLowerCase();
+  const cMobile = (customer.mobile || customer.customer_mobile || "").trim();
 
   // Customer Sales Deals
   const customerDeals = (deals || []).filter((d) => {
     if (d.isDeleted || d.type !== "Sell") return false;
     const matchId = cId && (d.customerId === cId || d.customerId === customer.customer_id);
     const matchName = cName && d.customerName && d.customerName.trim().toLowerCase() === cName;
-    return Boolean(matchId || matchName);
+    const matchMobile = cMobile && ((d.customerMobile || d.mobile || "").trim() === cMobile);
+    return Boolean(matchId || matchName || matchMobile);
   });
 
   let salesTotal = 0;
@@ -268,7 +270,8 @@ export function calculateCustomerTotalStats(customer, purchases = [], deals = []
     if (!isCustSourced) return false;
     const matchId = cId && (p.sellerId === cId || p.seller_id === cId || p.supplier_id === cId);
     const matchName = cName && ((p.sellerName && p.sellerName.trim().toLowerCase() === cName) || (p.customerName && p.customerName.trim().toLowerCase() === cName));
-    return Boolean(matchId || matchName);
+    const matchMobile = cMobile && ((p.sellerMobile || p.seller_mobile || p.mobile || "").trim() === cMobile);
+    return Boolean(matchId || matchName || matchMobile);
   });
 
   let purchaseTotal = 0;

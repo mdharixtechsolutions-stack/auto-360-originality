@@ -51,7 +51,7 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
     email: "",
     mobile: "",
     role: "Sales",
-    branch: "Coimbatore",
+    branch: "Tiruppur",
     loginFrom: "09:00",
     loginTo: "18:00",
     password: ""
@@ -157,7 +157,7 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
         email: "",
         mobile: "",
         role: "Sales",
-        branch: branches && branches.length > 0 ? branches[0].name : "Coimbatore",
+        branch: branches && branches.length > 0 ? branches[0].name : "Tiruppur",
         loginFrom: "09:00",
         loginTo: "18:00",
         password: ""
@@ -272,7 +272,7 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
                 email: "",
                 mobile: "",
                 role: "Sales",
-                branch: branches && branches.length > 0 ? branches[0].name : "Coimbatore",
+                branch: branches && branches.length > 0 ? branches[0].name : "Tiruppur",
                 loginFrom: "09:00",
                 loginTo: "18:00",
                 password: ""
@@ -512,10 +512,7 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
                       ))
                     ) : (
                       <>
-                        <option>Coimbatore</option>
-                        <option>Erode</option>
-                        <option>Salem</option>
-                        <option>Madurai</option>
+                        <option>Tiruppur</option>
                       </>
                     )}
                   </select>

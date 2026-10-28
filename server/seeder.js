@@ -2,8 +2,8 @@ import fs from "fs";
 import path from "path";
 
 // Standard categories, branches, and lists
-const BRANCHES = ["Coimbatore", "Erode", "Salem"];
-const BR_IDS = { "Coimbatore": "BR001", "Erode": "BR002", "Salem": "BR003" };
+const BRANCHES = ["Tiruppur"];
+const BR_IDS = { "Tiruppur": "BR001" };
 
 const CAR_BRANDS = ["Maruti Suzuki", "Hyundai", "Tata", "Honda", "Mahindra", "Toyota", "Kia", "Renault"];
 const BRAND_MODELS = {
@@ -224,6 +224,7 @@ export function seedDatabase(db, force = false) {
       owner_details: getRandomItem(OWNER_TYPES),
       engine_number: `ENG${getRandomInt(100000, 999999)}`,
       chassis_number: `CHA${getRandomInt(100000, 999999)}`,
+      rc_available: getRandomItem(["Yes", "Yes", "Yes", "No"]),
       challan_pending: getRandomItem(["No", "No", "No", "Yes"]),
       noc_available: getRandomItem(["Yes", "Yes", "No"]),
       insurance_active: getRandomItem(["Yes", "Yes", "No"]),

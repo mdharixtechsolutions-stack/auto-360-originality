@@ -28,7 +28,10 @@ import {
   Sparkles,
   ShieldCheck,
   Award,
-  Check
+  Check,
+  Calendar,
+  Filter,
+  RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -38,6 +41,7 @@ import { hasModulePermission } from "../lib/permissions";
 import { getStateCode } from "../data/indianStates";
 import SalesPosterModal from "./SalesPosterModal";
 import { calculateVehiclePurchaseOutstanding } from "../lib/outstandingCalculator";
+import CustomerFormModal from "./CustomerFormModal";
 
 const STANDARD_TOP_FEATURES = [
   "Touch Screen Display",
@@ -88,28 +92,128 @@ export default function PurchasesListAndForm({
   customers,
   suppliers,
   onUpdateDeals,
+  onUpdateCustomers,
   onNavigate,
   selectedBranch = "all",
   currentUser,
   businessProfile,
   initialSearch,
+  initialCustomer,
+  onRefreshData,
   payments = [],
   vouchers = []
 }) {
   const [purchases, setPurchases] = useState([]);
+  const [allFilteredPurchases, setAllFilteredPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchQuery, setSearchQuery] = useState(initialSearch || "");
 
+  const [customerFlow, setCustomerFlow] = useState("existing");
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerMobile, setNewCustomerMobile] = useState("");
+  const [newCustomerCity, setNewCustomerCity] = useState("");
+  const [newCustomerArea, setNewCustomerArea] = useState("");
+  const [newCustomerSubArea, setNewCustomerSubArea] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
+
   useEffect(() => {
-    if (initialSearch !== undefined) {
+    if (initialSearch !== undefined && initialSearch !== "") {
       setSearchQuery(initialSearch);
+      setTypeFilter("all");
+      setStatusFilter("all");
+      setFromDate("");
+      setToDate("");
+      setLocalFrom("");
+      setLocalTo("");
+      setSelectedPreset("all");
+      setPage(1);
     }
   }, [initialSearch]);
+
+  useEffect(() => {
+    if (initialCustomer) {
+      setShowAddEditModal(true);
+      setIsEditMode(false);
+      const cId = initialCustomer.id || initialCustomer.customer_id;
+      setFormState(prev => ({
+        ...prev,
+        purchase_type: "Customer",
+        seller_id: cId,
+        seller_name: initialCustomer.name || initialCustomer.customer_name || "",
+        seller_mobile: initialCustomer.mobile || initialCustomer.customer_mobile || "",
+        seller_address: initialCustomer.address || ""
+      }));
+    }
+  }, [initialCustomer]);
   const [localFrom, setLocalFrom] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
   const [localTo, setLocalTo] = useState(() => localStorage.getItem("financialYearTo") || "2026-03-31");
   const [fromDate, setFromDate] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
   const [toDate, setToDate] = useState(() => localStorage.getItem("financialYearTo") || "2026-03-31");
+  const [selectedPreset, setSelectedPreset] = useState("thisFY");
+
+  const getPresetDates = (presetId) => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    switch (presetId) {
+      case "today":
+        return { from: todayStr, to: todayStr };
+      case "thisWeek": {
+        const d = new Date(today);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        return {
+          from: monday.toISOString().split("T")[0],
+          to: sunday.toISOString().split("T")[0]
+        };
+      }
+      case "thisMonth": {
+        const firstDay = `${yyyy}-${mm}-01`;
+        const lastDayNum = new Date(yyyy, today.getMonth() + 1, 0).getDate();
+        const lastDay = `${yyyy}-${mm}-${String(lastDayNum).padStart(2, "0")}`;
+        return { from: firstDay, to: lastDay };
+      }
+      case "lastMonth": {
+        const prevMonthDate = new Date(yyyy, today.getMonth() - 1, 1);
+        const pYear = prevMonthDate.getFullYear();
+        const pMonth = String(prevMonthDate.getMonth() + 1).padStart(2, "0");
+        const lastDayNum = new Date(pYear, prevMonthDate.getMonth() + 1, 0).getDate();
+        return {
+          from: `${pYear}-${pMonth}-01`,
+          to: `${pYear}-${pMonth}-${String(lastDayNum).padStart(2, "0")}`
+        };
+      }
+      case "thisFY": {
+        const fyFrom = localStorage.getItem("financialYearFrom") || "2025-04-01";
+        const fyTo = localStorage.getItem("financialYearTo") || "2026-03-31";
+        return { from: fyFrom, to: fyTo };
+      }
+      case "allTime": {
+        return { from: "", to: "" };
+      }
+      default:
+        return null;
+    }
+  };
+
+  const handlePresetClick = (presetId) => {
+    setSelectedPreset(presetId);
+    const range = getPresetDates(presetId);
+    if (range) {
+      setLocalFrom(range.from);
+      setLocalTo(range.to);
+      setFromDate(range.from);
+      setToDate(range.to);
+      setPage(1);
+    }
+  };
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -117,6 +221,7 @@ export default function PurchasesListAndForm({
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [showAddEditModal, setShowAddEditModal] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -159,6 +264,7 @@ export default function PurchasesListAndForm({
     owner_details: "1st Owner",
     engine_number: "",
     chassis_number: "",
+    rc_available: "Yes",
     challan_pending: "No",
     noc_available: "No",
     insurance_active: "No",
@@ -190,20 +296,20 @@ export default function PurchasesListAndForm({
     status: "Available"
   });
   const availableBrands = useMemo(() => {
-    if (!formState.vehicle_type) return brands;
-    const modelsOfType = vehicleNames.filter((vn) => vn.vehicleType === formState.vehicle_type && !vn.isDeleted);
-    const brandIdsOfType = new Set(modelsOfType.map((m) => m.brandId));
-    return brands.filter((b) => brandIdsOfType.has(b.id) || modelsOfType.some((m) => m.brandId === b.name));
-  }, [brands, vehicleNames, formState.vehicle_type]);
+    return (brands || []).filter((b) => !b.isDeleted);
+  }, [brands]);
   const availableModels = useMemo(() => {
-    let filtered = vehicleNames.filter((vn) => !vn.isDeleted);
-    if (formState.vehicle_type) {
-      filtered = filtered.filter((vn) => vn.vehicleType === formState.vehicle_type);
-    }
+    let filtered = (vehicleNames || []).filter((vn) => !vn.isDeleted);
     if (formState.brand_id) {
-      const targetBrand = brands.find((b) => b.name === formState.brand_id || b.id === formState.brand_id);
+      const targetBrand = (brands || []).find((b) => b.name === formState.brand_id || b.id === formState.brand_id);
       if (targetBrand) {
         filtered = filtered.filter((vn) => vn.brandId === targetBrand.id || vn.brandId === targetBrand.name);
+      }
+    }
+    if (formState.vehicle_type) {
+      const typeFiltered = filtered.filter((vn) => vn.vehicleType === formState.vehicle_type);
+      if (typeFiltered.length > 0) {
+        filtered = typeFiltered;
       }
     }
     return filtered;
@@ -220,10 +326,12 @@ export default function PurchasesListAndForm({
       if (res.ok) {
         const result = await res.json();
         setPurchases(result.data || []);
+        const allList = result.allFiltered || result.data || [];
+        setAllFilteredPurchases(allList);
         setTotalPages(result.pagination?.totalPages || 1);
-        setTotalCount(result.pagination?.totalCount || 0);
-        if (result.data) {
-          const mappedVehicles = result.data.map((p) => {
+        setTotalCount(result.pagination?.totalCount || allList.length || 0);
+        if (allList.length > 0) {
+          const mappedVehicles = allList.map((p) => {
             const purPrice = Number(p.purchase_price || p.purchasePrice) || 0;
             const advPrice = Number(
               p.advance_price !== undefined && p.advance_price !== null && p.advance_price !== ""
@@ -346,6 +454,21 @@ export default function PurchasesListAndForm({
       return;
     }
     const type = formState.purchase_type;
+    if (type === "Customer") {
+      const localCust = customers.find((c) => c.id === sellerId || c.customer_id === sellerId);
+      if (localCust) {
+        setFormState((prev) => ({
+          ...prev,
+          seller_id: sellerId,
+          seller_name: localCust.name || localCust.customer_name || "",
+          seller_mobile: localCust.mobile || localCust.customer_mobile || "",
+          seller_city_id: localCust.city_id || "",
+          seller_area_id: localCust.area_id || "",
+          seller_sub_area_id: localCust.sub_area_id || "",
+          seller_address: localCust.address || ""
+        }));
+      }
+    }
     const url = type === "Customer" ? `/api/customers/fetch/${sellerId}` : `/api/suppliers/fetch/${sellerId}`;
     try {
       const res = await fetch(url);
@@ -354,16 +477,76 @@ export default function PurchasesListAndForm({
         setFormState((prev) => ({
           ...prev,
           seller_id: sellerId,
-          seller_name: sellerData.customer_name || sellerData.supplier_name || "",
-          seller_mobile: sellerData.customer_mobile || sellerData.supplier_mobile || "",
-          seller_city_id: sellerData.city_id || "",
-          seller_area_id: sellerData.area_id || "",
-          seller_sub_area_id: sellerData.sub_area_id || "",
-          seller_address: sellerData.address || ""
+          seller_name: sellerData.customer_name || sellerData.supplier_name || sellerData.name || prev.seller_name,
+          seller_mobile: sellerData.customer_mobile || sellerData.supplier_mobile || sellerData.mobile || prev.seller_mobile,
+          seller_city_id: sellerData.city_id || prev.seller_city_id,
+          seller_area_id: sellerData.area_id || prev.seller_area_id,
+          seller_sub_area_id: sellerData.sub_area_id || prev.seller_sub_area_id,
+          seller_address: sellerData.address || prev.seller_address
         }));
       }
     } catch (e) {
       console.error("Error loading seller auto fetch details", e);
+    }
+  };
+
+  const handleQuickAddCustomer = async () => {
+    if (!newCustomerName.trim() || !newCustomerMobile.trim()) {
+      alert("Please enter Customer Name and Mobile Number");
+      return;
+    }
+    try {
+      const newCustPayload = {
+        name: newCustomerName.trim(),
+        mobile: newCustomerMobile.trim(),
+        city: newCustomerCity.trim() || "Coimbatore",
+        area: newCustomerArea.trim(),
+        subArea: newCustomerSubArea.trim(),
+        address: newCustomerAddress.trim(),
+        customer_type: "Sell",
+        requirement: "Sell",
+        status: "Direct Purchase Seller",
+        branch: currentUser?.branch || selectedBranch || "Coimbatore"
+      };
+
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newCustPayload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const saved = data.customer || { ...newCustPayload, id: data.id || `CUST-${Date.now()}` };
+        if (onUpdateCustomers) {
+          onUpdateCustomers((prev) => [...prev, saved]);
+        }
+        if (onRefreshData) onRefreshData();
+
+        const savedId = saved.id || saved.customer_id;
+        setFormState((prev) => ({
+          ...prev,
+          purchase_type: "Customer",
+          seller_id: savedId,
+          seller_name: saved.name || saved.customer_name || newCustomerName.trim(),
+          seller_mobile: saved.mobile || saved.customer_mobile || newCustomerMobile.trim(),
+          seller_address: saved.address || newCustomerAddress.trim()
+        }));
+
+        setCustomerFlow("existing");
+        setNewCustomerName("");
+        setNewCustomerMobile("");
+        setNewCustomerCity("");
+        setNewCustomerArea("");
+        setNewCustomerSubArea("");
+        setNewCustomerAddress("");
+        alert(`Customer "${saved.name || newCustomerName.trim()}" created successfully and selected as seller!`);
+      } else {
+        alert("Failed to create customer. Please try again.");
+      }
+    } catch (err) {
+      console.error("[Quick Add Customer Error]", err);
+      alert("Error saving customer. Please try again.");
     }
   };
   const compressImage = (file, maxWidth = 1600, maxHeight = 1600, quality = 0.8) => {
@@ -682,6 +865,7 @@ export default function PurchasesListAndForm({
       owner_details: "1st Owner",
       engine_number: "",
       chassis_number: "",
+      rc_available: "Yes",
       challan_pending: "No",
       noc_available: "No",
       insurance_active: "No",
@@ -935,7 +1119,7 @@ export default function PurchasesListAndForm({
       const textStartX = hasLogo ? 43 : 20;
 
       // Company Name
-      const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+      const compName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
       doc.setFontSize(16);
       doc.setTextColor(30, 41, 59);
       doc.text(compName.toUpperCase(), textStartX, 16);
@@ -1070,7 +1254,7 @@ export default function PurchasesListAndForm({
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(120);
-      doc.text(`Generated via ${businessProfile?.companyName || "Auto360 Consultancy"} Enterprise ERP`, 120, sigY + 4);
+      doc.text(`Generated via ${businessProfile?.companyName || "Auto 360 Consultancy"} Enterprise ERP`, 120, sigY + 4);
 
       doc.save(`Invoice_Purchase_${p.purchase_id}.pdf`);
     };
@@ -1114,14 +1298,24 @@ export default function PurchasesListAndForm({
       drawPDFContent(logoData, sigData);
     });
   };
-  const totalStockValue = purchases.reduce((acc, current) => acc + (Number(current.purchase_price) || 0), 0);
+  const totalStockValue = useMemo(() => {
+    const listToCalculate = allFilteredPurchases.length > 0 ? allFilteredPurchases : purchases;
+    return listToCalculate.reduce((acc, current) => acc + (Number(current.purchase_price || current.purchasePrice) || 0), 0);
+  }, [allFilteredPurchases, purchases]);
+
+  const availableStockCount = useMemo(() => {
+    const listToCalculate = allFilteredPurchases.length > 0 ? allFilteredPurchases : purchases;
+    return listToCalculate.filter((p) => p.status === "Available").length;
+  }, [allFilteredPurchases, purchases]);
+
   const totalActiveBalance = useMemo(() => {
-    return purchases.reduce((acc, current) => {
+    const listToCalculate = allFilteredPurchases.length > 0 ? allFilteredPurchases : purchases;
+    return listToCalculate.reduce((acc, current) => {
       if (current.isDeleted) return acc;
       const stats = calculateVehiclePurchaseOutstanding(current, payments, vouchers);
       return acc + stats.outstanding;
     }, 0);
-  }, [purchases, payments, vouchers]);
+  }, [allFilteredPurchases, purchases, payments, vouchers]);
   return <div className="space-y-6">
       {
     /* Title & Header Section  */
@@ -1161,7 +1355,7 @@ export default function PurchasesListAndForm({
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-emerald-600">Available Stock</p>
             <h3 className="text-xl font-extrabold text-slate-900 mt-1">
-              {purchases.filter((p) => p.status === "Available").length} Units
+              {availableStockCount} Units
             </h3>
           </div>
           <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl">
@@ -1228,7 +1422,7 @@ export default function PurchasesListAndForm({
     /* Dynamic status filters */
   }
         <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full md:w-auto overflow-x-auto no-scrollbar">
-          {["all", "Available", "Booked", "Sold"].map((status) => <button
+          {["all", "Available", "Booked", "Service Process", "Sold"].map((status) => <button
     key={status}
     onClick={() => {
       setStatusFilter(status);
@@ -1244,52 +1438,99 @@ export default function PurchasesListAndForm({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center bg-white border border-slate-200 p-3 rounded-2xl gap-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">From</span>
-          <input
-            type="date"
-            value={localFrom}
-            onChange={(e) => setLocalFrom(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-bold font-mono focus:ring-2 focus:ring-indigo-500"
-          />
+      {/* Modern User-Friendly Date Filter Bar */}
+      <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Calendar size={15} className="text-indigo-600" />
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Date Period Filter</span>
+          </div>
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: "thisFY", label: "This FY" },
+              { id: "thisMonth", label: "This Month" },
+              { id: "lastMonth", label: "Last Month" },
+              { id: "thisWeek", label: "This Week" },
+              { id: "today", label: "Today" },
+              { id: "allTime", label: "All Time" }
+            ].map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handlePresetClick(preset.id)}
+                className={cn(
+                  "px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-lg transition-all border cursor-pointer",
+                  selectedPreset === preset.id
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">To</span>
-          <input
-            type="date"
-            value={localTo}
-            onChange={(e) => setLocalTo(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-bold font-mono focus:ring-2 focus:ring-indigo-500"
-          />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">From:</span>
+            <input
+              type="date"
+              value={localFrom}
+              onChange={(e) => {
+                setLocalFrom(e.target.value);
+                setSelectedPreset("custom");
+              }}
+              className="bg-transparent border-none outline-none text-xs font-bold font-mono text-slate-800"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">To:</span>
+            <input
+              type="date"
+              value={localTo}
+              onChange={(e) => {
+                setLocalTo(e.target.value);
+                setSelectedPreset("custom");
+              }}
+              className="bg-transparent border-none outline-none text-xs font-bold font-mono text-slate-800"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFromDate(localFrom);
+              setToDate(localTo);
+              setPage(1);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all font-mono cursor-pointer shadow-sm shadow-indigo-100 active:scale-95"
+          >
+            <Filter size={13} />
+            Apply Filter
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const fyFrom = localStorage.getItem("financialYearFrom") || "2025-04-01";
+              const fyTo = localStorage.getItem("financialYearTo") || "2026-03-31";
+              setLocalFrom(fyFrom);
+              setLocalTo(fyTo);
+              setFromDate(fyFrom);
+              setToDate(fyTo);
+              setSelectedPreset("thisFY");
+              setSearchQuery("");
+              setPage(1);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-extrabold uppercase rounded-xl transition-all cursor-pointer"
+          >
+            <RotateCcw size={13} />
+            Reset
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setFromDate(localFrom);
-            setToDate(localTo);
-            setPage(1);
-          }}
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-xl transition-all font-mono cursor-pointer shadow-sm shadow-indigo-100"
-        >
-          GO
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const fyFrom = localStorage.getItem("financialYearFrom") || "2025-04-01";
-            const fyTo = localStorage.getItem("financialYearTo") || "2026-03-31";
-            setLocalFrom(fyFrom);
-            setLocalTo(fyTo);
-            setFromDate(fyFrom);
-            setToDate(fyTo);
-            setSearchQuery("");
-            setPage(1);
-          }}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer"
-        >
-          Reset
-        </button>
       </div>
 
       {
@@ -1308,6 +1549,7 @@ export default function PurchasesListAndForm({
     const statusColors = {
       "available": "bg-emerald-50 text-emerald-700 border-emerald-200",
       "booked": "bg-amber-50 text-amber-700 border-amber-200",
+      "service process": "bg-blue-50 text-blue-700 border-blue-200",
       "sold": "bg-slate-100 text-slate-700 border-slate-200",
       "loan active": "bg-indigo-50 text-indigo-700 border-indigo-200",
       "binding loan closed": "bg-teal-50 text-teal-700 border-teal-200",
@@ -1347,11 +1589,16 @@ export default function PurchasesListAndForm({
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
                       {
-      /* Registration No Badge */
+      /* Registration No Badge & Purchase Number */
     }
-                      <span className="inline-block font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-extrabold uppercase tracking-wide mb-2">
-                        {p.reg_no || "No Reg No"}
-                      </span>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="inline-block font-mono bg-slate-100 text-slate-800 border border-slate-200/80 px-2 py-0.5 rounded text-[11px] font-extrabold uppercase tracking-wide">
+                          {p.reg_no || "No Reg No"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-mono bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider">
+                          #{p.purchase_id || p.id}
+                        </span>
+                      </div>
 
                       {
       /* Title */
@@ -1403,6 +1650,9 @@ export default function PurchasesListAndForm({
                       const totalCost = purchasePrice + totalExpenses + consultancyFees;
                       const expectedSellingPrice = Number(p.expected_selling_price) || 0;
                       const potentialProfit = expectedSellingPrice > 0 ? (expectedSellingPrice - totalCost) : 0;
+                      const isChallanPending = p.challan_pending === "Yes" || p.challan?.hasChallan === true;
+                      const challanAmt = Number(p.challan_amount || p.challan?.amount) || 0;
+
                       return (
                         <div className="mt-4 pt-3 border-t border-slate-100/80 grid grid-cols-2 gap-x-4 gap-y-2.5">
                           <div>
@@ -1414,8 +1664,21 @@ export default function PurchasesListAndForm({
                             <p className="text-xs font-bold text-slate-800">₹{(Number(totalExpenses) || 0).toLocaleString("en-IN")}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Consultancy Fees</p>
-                            <p className="text-xs font-bold text-slate-800">₹{(Number(consultancyFees) || 0).toLocaleString("en-IN")}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Challan Details</p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-tight",
+                                isChallanPending ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              )}>
+                                <span className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  isChallanPending ? "bg-rose-500" : "bg-emerald-500"
+                                )} />
+                                {isChallanPending
+                                  ? `Pending${challanAmt > 0 ? ` (₹${challanAmt.toLocaleString("en-IN")})` : ""}`
+                                  : "No Challan"}
+                              </span>
+                            </div>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Cost</p>
@@ -1738,26 +2001,33 @@ export default function PurchasesListAndForm({
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="flex items-center gap-2">
                           <span className={cn(
-    "w-2.5 h-2.5 rounded-full",
-    selectedPurchase.challan_pending === "Yes" ? "bg-rose-500" : "bg-emerald-500"
-  )} />
-                          <span className="font-semibold text-slate-600">Challan Pending: <b className="text-slate-800">{selectedPurchase.challan_pending}</b></span>
+                            "w-2.5 h-2.5 rounded-full",
+                            (selectedPurchase.rc_available === "No") ? "bg-rose-500" : "bg-emerald-500"
+                          )} />
+                          <span className="font-semibold text-slate-600">RC Available: <b className="text-slate-800">{selectedPurchase.rc_available || "Yes"}</b></span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={cn(
-    "w-2.5 h-2.5 rounded-full",
-    selectedPurchase.noc_available === "Yes" ? "bg-emerald-500" : "bg-amber-400"
-  )} />
+                            "w-2.5 h-2.5 rounded-full",
+                            selectedPurchase.challan_pending === "Yes" ? "bg-rose-500" : "bg-emerald-500"
+                          )} />
+                          <span className="font-semibold text-slate-600">Challan Pending: <b className="text-slate-800">{selectedPurchase.challan_pending || "No"}{selectedPurchase.challan_pending === "Yes" && Number(selectedPurchase.challan_amount) > 0 ? ` (₹${Number(selectedPurchase.challan_amount).toLocaleString("en-IN")})` : ""}</b></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "w-2.5 h-2.5 rounded-full",
+                            selectedPurchase.noc_available === "Yes" ? "bg-emerald-500" : "bg-amber-400"
+                          )} />
                           <span className="font-semibold text-slate-600">NOC Available: <b className="text-slate-800">{selectedPurchase.noc_available}</b></span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={cn(
-    "w-2.5 h-2.5 rounded-full",
-    selectedPurchase.insurance_active === "Yes" ? "bg-emerald-500" : "bg-amber-400"
-  )} />
+                            "w-2.5 h-2.5 rounded-full",
+                            selectedPurchase.insurance_active === "Yes" ? "bg-emerald-500" : "bg-amber-400"
+                          )} />
                           <span className="font-semibold text-slate-600">Insurance Active: <b className="text-slate-800">{selectedPurchase.insurance_active}</b></span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 col-span-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
                           <span className="font-semibold text-slate-600">Owner Category: <b className="text-slate-800">{selectedPurchase.owner_details}</b></span>
                         </div>
@@ -2088,12 +2358,12 @@ export default function PurchasesListAndForm({
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Purchase ID</label>
                       <input
-    type="text"
-    value={formState.purchase_id}
-    readOnly
-    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none font-bold text-indigo-700 cursor-not-allowed text-sm"
-    placeholder="PUR001"
-  />
+                        type="text"
+                        value={formState.purchase_id || ""}
+                        onChange={(e) => setFormState((prev) => ({ ...prev, purchase_id: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700 text-sm"
+                        placeholder="PUR001"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Purchase Date</label>
@@ -2131,64 +2401,121 @@ export default function PurchasesListAndForm({
                     </div>
                   </div>
 
-                  {
-    /* Dynamic Seller Selection Box depending on Sourcing type */
-  }
+                  {/* Dynamic Seller Selection Box depending on Sourcing type */}
                   <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-200/50 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-bold text-amber-800 uppercase tracking-widest">Dynamic Sourced Contact Selector</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">Auto loads address information automatically on select</p>
+                    <div className="flex flex-wrap justify-between items-center gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-amber-800 uppercase tracking-widest">Dynamic Sourced Contact Selector</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">Auto loads seller contact & address information</p>
+                      </div>
+                      {formState.purchase_type === "Customer" && (
+                        <div className="flex items-center gap-1.5 bg-amber-100/70 p-1 rounded-lg border border-amber-200">
+                          <button
+                            type="button"
+                            onClick={() => setCustomerFlow("existing")}
+                            className={cn(
+                              "px-2.5 py-1 text-xs font-bold rounded-md transition-all",
+                              customerFlow === "existing" ? "bg-amber-700 text-white shadow-sm" : "text-amber-800 hover:bg-amber-200/50"
+                            )}
+                          >
+                            Existing Customer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomerFlow("new");
+                              setShowCustomerModal(true);
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer",
+                              customerFlow === "new" ? "bg-amber-700 text-white shadow-sm" : "text-amber-800 hover:bg-amber-200/50"
+                            )}
+                          >
+                            + Direct Add Customer
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {formState.purchase_type === "Customer" ? <div className="space-y-1">
-                          <label className="text-xs font-extrabold text-amber-800 uppercase tracking-widest">Customer ID Dropdown</label>
-                          <select
-    required
-    value={formState.seller_id}
-    onChange={(e) => handleSellerChange(e.target.value)}
-    className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
-  >
-                            <option value="">-- Choose Customer (Seller) --</option>
-                            {customers
-                              .filter((c) => !c.isDeleted && ((c.customer_type === "Sell" || c.requirement === "Sell" || (c.customer_type !== "Buy" && c.requirement !== "Buy")) || c.id === formState.seller_id))
-                              .map((c) => {
-                                const roleSuffix = (c.name || "").includes("(Seller)") ? "" : " (Seller)";
-                                return (
-                                  <option key={c.id} value={c.id}>
-                                    {c.id} - {c.name}{roleSuffix}
+                      {formState.purchase_type === "Customer" ? (
+                        customerFlow === "existing" ? (
+                          <div className="space-y-1">
+                            <label className="text-xs font-extrabold text-amber-800 uppercase tracking-widest">Customer Dropdown</label>
+                            <select
+                              required
+                              value={formState.seller_id}
+                              onChange={(e) => handleSellerChange(e.target.value)}
+                              className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
+                            >
+                              <option value="">-- Choose Customer (Seller) --</option>
+                              {customers
+                                .filter((c) => !c.isDeleted)
+                                .map((c) => (
+                                  <option key={c.id || c.customer_id} value={c.id || c.customer_id}>
+                                    {c.id || c.customer_id} - {c.name || c.customer_name} ({c.mobile || c.customer_mobile || "No Mobile"})
                                   </option>
-                                );
-                              })}
-                          </select>
-                        </div> : <div className="space-y-1">
+                                ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-300 col-span-2 shadow-sm text-center">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">Direct Customer Entry</span>
+                              <span className="text-[10px] text-amber-700 font-medium">Full customer profile form with documents & photo verification</span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium my-2">
+                              Create a new customer lead with all 16 fields (Aadhaar, PAN, Photos, Location Master) and link directly to this purchase.
+                            </p>
+                            <div className="flex justify-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setCustomerFlow("existing")}
+                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowCustomerModal(true)}
+                                className="px-5 py-2 bg-amber-600 text-white rounded-xl font-bold text-xs hover:bg-amber-700 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                              >
+                                <Plus size={16} /> Open Customer Entry Form
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="space-y-1">
                           <label className="text-xs font-extrabold text-amber-800 uppercase tracking-widest">Supplier ID Dropdown</label>
                           <select
-    required
-    value={formState.seller_id}
-    onChange={(e) => handleSellerChange(e.target.value)}
-    className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
-  >
+                            required
+                            value={formState.seller_id}
+                            onChange={(e) => handleSellerChange(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
+                          >
                             <option value="">-- Choose Supplier --</option>
-                            {suppliers.filter((s) => !s.isDeleted).map((s) => <option key={s.id} value={s.id}>
+                            {suppliers.filter((s) => !s.isDeleted).map((s) => (
+                              <option key={s.id} value={s.id}>
                                 {s.id} - {s.name}
-                              </option>)}
+                              </option>
+                            ))}
                           </select>
-                        </div>}
+                        </div>
+                      )}
 
-                      {
-    /* Display Read Only Fields loaded dynamically */
-  }
-                      <div className="grid grid-cols-2 gap-2 text-xs font-medium text-slate-500 sm:col-span-1 self-center bg-white p-3 rounded-xl border border-amber-100">
-                        <div>
-                          <span className="text-[9px] text-slate-400 block uppercase font-bold">Name</span>
-                          <span className="text-slate-800 font-bold block truncate">{formState.seller_name || "Loading..."}</span>
+                      {customerFlow === "existing" && (
+                        <div className="grid grid-cols-2 gap-2 text-xs font-medium text-slate-500 sm:col-span-1 self-center bg-white p-3 rounded-xl border border-amber-100">
+                          <div>
+                            <span className="text-[9px] text-slate-400 block uppercase font-bold">Name</span>
+                            <span className="text-slate-800 font-bold block truncate">{formState.seller_name || "Select Seller..."}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 block uppercase font-bold">Mobile Line</span>
+                            <span className="text-slate-800 font-bold block">{formState.seller_mobile || "Select Seller..."}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[9px] text-slate-400 block uppercase font-bold">Mobile Line</span>
-                          <span className="text-slate-800 font-bold block">{formState.seller_mobile || "Loading..."}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
@@ -2403,14 +2730,26 @@ export default function PurchasesListAndForm({
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Acquisition Compliance Statuses</h4>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">RC Available?</label>
+                        <select
+                          value={formState.rc_available || "Yes"}
+                          onChange={(e) => setFormState((prev) => ({ ...prev, rc_available: e.target.value }))}
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
+                        >
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
+
                       <div className="space-y-1">
                         <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Challan Pending?</label>
                         <select
-    value={formState.challan_pending}
-    onChange={(e) => setFormState((prev) => ({ ...prev, challan_pending: e.target.value }))}
-    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-  >
+                          value={formState.challan_pending}
+                          onChange={(e) => setFormState((prev) => ({ ...prev, challan_pending: e.target.value }))}
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
+                        >
                           <option value="Yes">Yes</option>
                           <option value="No">No</option>
                         </select>
@@ -2432,10 +2771,10 @@ export default function PurchasesListAndForm({
                       <div className="space-y-1">
                         <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">NOC Available?</label>
                         <select
-    value={formState.noc_available}
-    onChange={(e) => setFormState((prev) => ({ ...prev, noc_available: e.target.value }))}
-    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-  >
+                          value={formState.noc_available}
+                          onChange={(e) => setFormState((prev) => ({ ...prev, noc_available: e.target.value }))}
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
+                        >
                           <option value="Yes">Yes</option>
                           <option value="No">No</option>
                         </select>
@@ -2446,7 +2785,7 @@ export default function PurchasesListAndForm({
                         <select
                           value={formState.insurance_active}
                           onChange={(e) => setFormState((prev) => ({ ...prev, insurance_active: e.target.value }))}
-                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-semibold"
                         >
                           <option value="Yes">Yes</option>
                           <option value="No">No</option>
@@ -3155,6 +3494,7 @@ export default function PurchasesListAndForm({
   >
                       <option value="Available">Available for Sale</option>
                       <option value="Booked">Reserved Booked</option>
+                      <option value="Service Process">Service Process</option>
                       <option value="Sold">Completed Sold</option>
                     </select>
                   </div>
@@ -3387,6 +3727,46 @@ export default function PurchasesListAndForm({
         businessProfile={businessProfile}
         isOpen={!!vehicleToShare}
         onClose={() => setVehicleToShare(null)}
+      />
+
+      {/* Direct Customer Entry Modal for Sellers in Purchase */}
+      <CustomerFormModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        currentUser={currentUser}
+        defaultType="Sell"
+        onSuccess={(savedCustomer) => {
+          const normalized = {
+            id: savedCustomer.customer_id || savedCustomer.id,
+            customer_id: savedCustomer.customer_id || savedCustomer.id,
+            name: savedCustomer.customer_name || savedCustomer.name,
+            customer_name: savedCustomer.customer_name || savedCustomer.name,
+            mobile: savedCustomer.customer_mobile || savedCustomer.mobile,
+            customer_mobile: savedCustomer.customer_mobile || savedCustomer.mobile,
+            address: savedCustomer.address || "",
+            city_id: savedCustomer.city_id || savedCustomer.cityId || "",
+            area_id: savedCustomer.area_id || savedCustomer.areaId || "",
+            sub_area_id: savedCustomer.sub_area_id || savedCustomer.subAreaId || "",
+            ...savedCustomer
+          };
+          if (onUpdateCustomers) {
+            onUpdateCustomers((prev) => [normalized, ...(prev || []).filter((c) => (c.id || c.customer_id) !== normalized.id)]);
+          }
+          if (onRefreshData) onRefreshData();
+          setFormState((prev) => ({
+            ...prev,
+            purchase_type: "Customer",
+            seller_id: normalized.id,
+            seller_name: normalized.name,
+            seller_mobile: normalized.mobile,
+            seller_address: normalized.address || "",
+            seller_city_id: normalized.city_id || "",
+            seller_area_id: normalized.area_id || "",
+            seller_sub_area_id: normalized.sub_area_id || ""
+          }));
+          setCustomerFlow("existing");
+          setShowCustomerModal(false);
+        }}
       />
 
     </div>;

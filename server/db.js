@@ -45,39 +45,13 @@ const defaultSchema = {
   branches: [
     {
       id: "BR001",
-      name: "Coimbatore",
+      name: "Tiruppur",
       mobile: "9876500001",
-      email: "coimbatore@auto360.com",
-      address: "123 Avinashi Road, Gandhipuram",
-      city: "Coimbatore",
-      area: "Gandhipuram",
-      subArea: "Cross Cut Road",
-      status: "Active",
-      isDeleted: false,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "BR002",
-      name: "Erode",
-      mobile: "9876500002",
-      email: "erode@auto360.com",
-      address: "45 Brough Road near Bus Stand",
-      city: "Erode",
-      area: "Erode Central",
-      subArea: "Sathy Road",
-      status: "Active",
-      isDeleted: false,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "BR003",
-      name: "Salem",
-      mobile: "9876500003",
-      email: "salem@auto360.com",
-      address: "78 Junction Road, Opp Train Station",
-      city: "Salem",
-      area: "Salem Junction",
-      subArea: "Meyyanur",
+      email: "tiruppur@auto360.com",
+      address: "Tiruppur Main Road",
+      city: "Tiruppur",
+      area: "Tiruppur Centre",
+      subArea: "Main Road",
       status: "Active",
       isDeleted: false,
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -92,7 +66,7 @@ const defaultSchema = {
       email: "john@auto360.com",
       mobile: "9876543210",
       role: "Super Admin",
-      branch: "Coimbatore",
+      branch: "Tiruppur",
       branch_id: "BR001",
       isActive: true,
       loginTimeFrom: "00:00",
@@ -341,9 +315,7 @@ function initDb() {
       const sanitizeBranchName = (val) => {
         if (typeof val !== "string") return val;
         let clean = val.replace(/\s*branch\s*$/i, "").trim();
-        if (clean.toLowerCase() === "coimbatore") return "Coimbatore";
-        if (clean.toLowerCase() === "erode") return "Erode";
-        if (clean.toLowerCase() === "salem") return "Salem";
+        if (clean.toLowerCase() === "tiruppur") return "Tiruppur";
         return clean;
       };
 
@@ -358,8 +330,8 @@ function initDb() {
           }
         });
         
-        // Let's ensure default branches Coimbatore, Erode, Salem are in branches
-        const defaultBranchKeys = ["Coimbatore", "Erode", "Salem"];
+        // Let's ensure default branch Tiruppur is in branches
+        const defaultBranchKeys = ["Tiruppur"];
         defaultBranchKeys.forEach(name => {
           if (!uniqueBranches[name]) {
             const defB = defaultSchema.branches.find(b => b.name === name);

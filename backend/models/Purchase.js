@@ -23,7 +23,7 @@ const purchaseSchema = new mongoose.Schema({
   supplier_id: { type: String, default: "" },
   supplier_name: { type: String, default: "" },
   branch_id: { type: String, default: "BR001" },
-  branch: { type: String, default: "Coimbatore" },
+  branch: { type: String, default: "Tiruppur" },
   status: { type: String, default: "Available" },
   vehicle_image: { type: String, default: "" },
   vehicle_images: {

@@ -33,7 +33,7 @@ export default function SalesPosterModal({ vehicle, deal, businessProfile, isOpe
   };
 
   // 1. Company Branding (Loaded dynamically from Company Settings / Business Profile)
-  const companyName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+  const companyName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
   const companyTagline = businessProfile?.tagline || businessProfile?.subTitle || "CERTIFIED PRE-OWNED AUTOMOBILE SHOWROOM";
   const companyLogo = businessProfile?.companyLogo || "";
   const address = businessProfile?.address || "";
@@ -43,7 +43,7 @@ export default function SalesPosterModal({ vehicle, deal, businessProfile, isOpe
   const fullAddress = [address, city, stateVal, pincode].filter(Boolean).join(", ") || "Main Road Showroom, Auto Hub City";
   const mobile = businessProfile?.mobileNumber || businessProfile?.phone || "+91 98765 43210";
   const whatsapp = businessProfile?.whatsAppNumber || mobile;
-  const website = businessProfile?.website || "www.auto360erp.com";
+  const website = businessProfile?.website || "www.auto360.com";
 
   // 2. Vehicle Details (Loaded dynamically from Purchase Record / Inventory / Deal Entry)
   const brandName = v.brand || v.brand_id || "PREMIUM VEHICLE";

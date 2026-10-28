@@ -19,7 +19,7 @@ export const generateCustomerReceiptPDF = (receiptData, businessProfile = {}) =>
     const textStartX = hasLogo ? 43 : 20;
 
     // Company Name
-    const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+    const compName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
     doc.setFontSize(16);
     doc.setTextColor(30, 41, 59);
     doc.text(compName.toUpperCase(), textStartX, 16);
@@ -154,7 +154,7 @@ export const generateCustomerReceiptPDF = (receiptData, businessProfile = {}) =>
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(120);
-    doc.text(`Generated via ${businessProfile?.companyName || "Auto360 Consultancy"}`, 140, sigY + 4);
+    doc.text(`Generated via ${businessProfile?.companyName || "Auto 360 Consultancy"}`, 140, sigY + 4);
 
     doc.save(`Receipt_${receiptData.receiptNo || receiptData.id || "Sales"}.pdf`);
   };

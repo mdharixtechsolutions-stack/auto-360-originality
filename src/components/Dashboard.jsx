@@ -211,7 +211,7 @@ export default function Dashboard({
     vehicleNames.forEach(vn => {
       const bFound = brands.find(b => b.id === vn.brandId);
       const bName = bFound ? bFound.name : "Other";
-      ["Coimbatore", "Erode", "Salem", "all"].forEach(br => {
+      ["Tiruppur", "all"].forEach(br => {
         const key = `Four Wheeler::${bName}::${vn.name}::${br}`;
         if (!groupings[key]) {
           groupings[key] = {
@@ -987,9 +987,7 @@ export default function Dashboard({
                     className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer"
                   >
                     <option value="all">All Branches</option>
-                    <option value="Coimbatore">Coimbatore</option>
-                    <option value="Erode">Erode</option>
-                    <option value="Salem">Salem</option>
+                    <option value="Tiruppur">Tiruppur</option>
                   </select>
                 </div>
 
@@ -1139,7 +1137,7 @@ export default function Dashboard({
 
             {/* Footer */}
             <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400 font-medium">
-              <span>Auto360 Fleet Stock Auditor Desk © 2026</span>
+              <span>Auto 360 Fleet Stock Auditor Desk © 2026</span>
               <span className="font-mono bg-white border px-2.5 py-0.5 rounded text-[10.5px] font-bold text-slate-500">Live Engine Connected</span>
             </div>
           </div>

@@ -86,13 +86,27 @@ export default function StockSearch({
         if (bName.toLowerCase() !== brandFilter.toLowerCase()) return false;
       }
 
-      // 3. Model Query search
+      // 3. Model / ID / Reg No Query search
       if (modelQuery.trim()) {
-        const query = modelQuery.toLowerCase();
-        const mName = (v.name || "").toLowerCase();
-        const mModel = (v.model || "").toLowerCase();
-        const mReg = (v.regNo || "").toLowerCase();
-        if (!mName.includes(query) && !mModel.includes(query) && !mReg.includes(query)) return false;
+        const query = modelQuery.toLowerCase().trim();
+        const cleanQ = query.replace(/[^a-z0-9]/gi, "");
+        const mName = (v.name || v.vehicle_name_id || "").toLowerCase();
+        const mModel = (v.model || v.model_details || "").toLowerCase();
+        const mReg = (v.regNo || v.reg_no || "").toLowerCase();
+        const cleanReg = mReg.replace(/[^a-z0-9]/gi, "");
+        const mId = (v.purchase_id || v.id || v.purchaseNo || "").toLowerCase();
+        const cleanId = mId.replace(/[^a-z0-9]/gi, "");
+        const mBrand = (v.brand || v.brand_id || "").toLowerCase();
+
+        const matches = 
+          mName.includes(query) || 
+          mModel.includes(query) || 
+          mReg.includes(query) || 
+          mId.includes(query) ||
+          mBrand.includes(query) ||
+          (cleanQ && (cleanId.includes(cleanQ) || cleanReg.includes(cleanQ) || cleanQ.includes(cleanId)));
+
+        if (!matches) return false;
       }
 
       // 4. Price & Range Checks
@@ -166,7 +180,7 @@ export default function StockSearch({
 
   // --- WhatsApp Sharing Msg Generator ---
   const handleWhatsAppShare = (v) => {
-    const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+    const compName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
     const phone = businessProfile?.whatsappNumber || businessProfile?.mobileNumber || "";
     const offerPrice = Math.round(v.purchasePrice ? v.purchasePrice * 1.15 : 45000);
     const msg = `*${compName.toUpperCase()} - VEHICLE FOR SALE*
@@ -576,7 +590,7 @@ _Interested? Book an appointment or call us for a live demo/test-drive!_`;
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0">
               <div>
                 <span className="text-[10px] font-black tracking-widest text-brand-400 uppercase font-mono">
-                  AUTO360 DIGITAL VEHICLE PASSPORT
+                  AUTO 360 DIGITAL VEHICLE PASSPORT
                 </span>
                 <h3 className="text-base font-extrabold tracking-tight mt-0.5">
                   {selectedVehicle.brand} {selectedVehicle.name} ({selectedVehicle.year})
@@ -671,7 +685,7 @@ _Interested? Book an appointment or call us for a live demo/test-drive!_`;
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Branch Location:</span>
-                    <span className="font-bold text-slate-800 capitalize">{selectedVehicle.branch || "Coimbatore Headquarters"}</span>
+                    <span className="font-bold text-slate-800 capitalize">{selectedVehicle.branch || "Tiruppur Headquarters"}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Challans Pending:</span>

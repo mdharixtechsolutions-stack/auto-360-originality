@@ -1,0 +1,16 @@
+{
+  "appId": "com.harixtech.auto360",
+  "appName": "Auto 360",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://auto360.harixtechsolutions.com",
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#070e20",
+    "captureInput": true
+  }
+}

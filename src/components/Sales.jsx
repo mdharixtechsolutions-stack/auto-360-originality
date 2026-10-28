@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Plus, Search, User, Car, FileText, X, Trash2, Printer, Edit2, Eye, ShieldCheck, CheckCircle2, CreditCard, Share2, Sparkles, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -6,6 +6,7 @@ import { generateCustomerReceiptPDF } from "../lib/receiptPdf";
 import { hasModulePermission } from "../lib/permissions";
 import { calculateDealSalesOutstanding } from "../lib/outstandingCalculator";
 import SalesPosterModal from "./SalesPosterModal";
+import CustomerFormModal from "./CustomerFormModal";
 
 const mockDeals = [
   {
@@ -33,11 +34,12 @@ const mockDeals = [
   }
 ];
 export default function Sales({
-  vehicles,
-  customers,
-  deals,
+  vehicles = [],
+  customers = [],
+  deals = [],
   payments = [],
   vouchers = [],
+  brands = [],
   onUpdateDeals,
   onUpdateVehicles,
   onUpdateCustomers,
@@ -48,6 +50,21 @@ export default function Sales({
   initialSearch,
   onRefreshData
 }) {
+  const photoInputRef = useRef(null);
+  const aadhaarInputRef = useRef(null);
+  const panInputRef = useRef(null);
+
+  const handleFileChange = (field, e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploads((prev) => ({ ...prev, [field]: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,9 +78,9 @@ export default function Sales({
 
   const handleOpenPoster = (deal, e) => {
     if (e) e.stopPropagation();
-    const veh = vehicles.find((v) => v.id === deal.vehicleId || v.purchase_id === deal.vehicleId) || {
-      name: deal.vehicleName,
-      sellingPrice: deal.sellingPrice
+    const veh = (vehicles || []).find((v) => v && (v.id === deal.vehicleId || v.purchase_id === deal.vehicleId)) || {
+      name: deal.vehicleName || deal.vehicle_name || "Vehicle",
+      sellingPrice: deal.sellingPrice || 0
     };
     setPosterDeal(deal);
     setPosterVehicle(veh);
@@ -71,8 +88,13 @@ export default function Sales({
   };
 
   useEffect(() => {
-    if (initialSearch !== undefined) {
+    if (initialSearch !== undefined && initialSearch !== "") {
       setSearchQuery(initialSearch);
+      setActiveTab("all");
+      setFromDate("");
+      setToDate("");
+      setLocalFrom("");
+      setLocalTo("");
     }
   }, [initialSearch]);
   const [localFrom, setLocalFrom] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
@@ -82,18 +104,21 @@ export default function Sales({
   const handleEditDeal = (deal, e) => {
     e.stopPropagation();
     setEditingDeal(deal);
-    const cust = customers.find((c) => c.id === deal.customerId) || { id: deal.customerId, name: deal.customerName, mobile: "" };
-    const veh = vehicles.find((v) => v.id === deal.vehicleId) || { id: deal.vehicleId, name: deal.vehicleName, purchasePrice: deal.purchasePrice, totalExpenses: deal.expenses };
+    setFormSaleId(deal.id || deal.deal_id || "");
+    const cust = (customers || []).find((c) => c && (c.id === deal.customerId || c.customer_id === deal.customerId)) || { id: deal.customerId, name: deal.customerName || "Customer", mobile: "" };
+    const veh = (vehicles || []).find((v) => v && (v.id === deal.vehicleId || v.purchase_id === deal.vehicleId)) || { id: deal.vehicleId, name: deal.vehicleName || "Vehicle", purchasePrice: deal.purchasePrice || 0, totalExpenses: deal.expenses || 0 };
     setSelectedCustomer(cust);
     setSelectedVehicle(veh);
+    setSelectedVehicleType(veh.vehicleType || veh.vehicle_type || "");
+    setSelectedVehicleBrand(veh.brand || veh.brand_id || "");
     setFormData({
-      sellingPrice: deal.sellingPrice,
-      advanceAmount: deal.advanceAmount,
-      expenses: deal.expenses,
+      sellingPrice: deal.sellingPrice || 0,
+      advanceAmount: deal.advanceAmount || 0,
+      expenses: deal.expenses || 0,
       consultancyFees: deal.consultancyFees || 0,
       aadhaarNumber: deal.aadhaarNumber || "",
       panNumber: deal.panNumber || "",
-      date: deal.date,
+      date: deal.date || new Date().toISOString().split("T")[0],
       settlementType: deal.settlementType || (deal.balanceAmount === 0 ? "Fully Paid" : "Customer Balance Pending"),
       financeName: deal.financeName || "",
       financeRef: deal.financeRef || ""
@@ -116,11 +141,11 @@ export default function Sales({
           method: "DELETE"
         });
         if (res.ok) {
-          onUpdateDeals((prev) => prev.filter((d) => d.id !== dealToDelete));
-          const deal = deals.find((d) => d.id === dealToDelete);
-          if (deal && deal.vehicleId) {
-            onUpdateVehicles(vehicles.map(
-              (v) => v.id === deal.vehicleId ? { ...v, status: "Available" } : v
+          if (onUpdateDeals) onUpdateDeals((prev) => (prev || []).filter((d) => d && d.id !== dealToDelete));
+          const deal = (deals || []).find((d) => d && d.id === dealToDelete);
+          if (deal && deal.vehicleId && onUpdateVehicles) {
+            onUpdateVehicles((vehicles || []).map(
+              (v) => v && v.id === deal.vehicleId ? { ...v, status: "Available" } : v
             ));
           }
           if (onRefreshData) await onRefreshData();
@@ -136,6 +161,7 @@ export default function Sales({
   };
   const [activeTab, setActiveTab] = useState("all");
   const [isSaving, setIsSaving] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [customerFlow, setCustomerFlow] = useState("existing");
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerMobile, setNewCustomerMobile] = useState("");
@@ -166,35 +192,130 @@ export default function Sales({
       setShowCreateModal(true);
     }
   }, [initialVehicle]);
+
   const filteredDeals = useMemo(
-    () => deals.filter((d) => {
-      const matchesSearch = d.id.toLowerCase().includes(searchQuery.toLowerCase()) || d.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || d.vehicleName.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTab = activeTab === "all" || activeTab === "completed" && d.status === "Completed" || activeTab === "pending" && d.status === "Pending";
-      const isWithinFrom = fromDate ? d.date >= fromDate : true;
-      const isWithinTo = toDate ? d.date <= toDate : true;
+    () => (deals || []).filter((d) => {
+      if (!d) return false;
+      const q = (searchQuery || "").toLowerCase().trim();
+      const cleanQ = q.replace(/[^a-z0-9]/gi, "");
+      const dId = String(d.id || d.deal_id || d.sale_id || "").toLowerCase();
+      const cleanDId = dId.replace(/[^a-z0-9]/gi, "");
+      const cName = String(d.customerName || d.customer_name || "").toLowerCase();
+      const vName = String(d.vehicleName || d.vehicle_name || d.vehicleDetails || "").toLowerCase();
+      const cleanVName = vName.replace(/[^a-z0-9]/gi, "");
+      const rNo = String(d.regNo || d.reg_no || "").toLowerCase();
+      const cleanReg = rNo.replace(/[^a-z0-9]/gi, "");
+
+      const matchesSearch = !q ||
+        dId.includes(q) ||
+        cName.includes(q) ||
+        vName.includes(q) ||
+        rNo.includes(q) ||
+        (cleanQ && (cleanDId.includes(cleanQ) || cleanVName.includes(cleanQ) || cleanReg.includes(cleanQ)));
+
+      const matchesTab = activeTab === "all" || (activeTab === "completed" && d.status === "Completed") || (activeTab === "pending" && d.status === "Pending");
+      const isWithinFrom = fromDate ? (d.date || "") >= fromDate : true;
+      const isWithinTo = toDate ? (d.date || "") <= toDate : true;
       return matchesSearch && matchesTab && isWithinFrom && isWithinTo;
     }),
     [deals, searchQuery, activeTab, fromDate, toDate]
   );
+
   const stats = useMemo(() => {
     let totalSales = 0;
     let collections = 0;
     let pending = 0;
 
-    filteredDeals.forEach((d) => {
-      const res = calculateDealSalesOutstanding(d, payments, vouchers);
-      totalSales += res.totalSaleValue;
-      collections += res.totalReceived;
-      pending += res.outstanding;
+    (filteredDeals || []).forEach((d) => {
+      if (d) {
+        const res = calculateDealSalesOutstanding(d, payments || [], vouchers || []);
+        totalSales += Number(res.totalSaleValue) || 0;
+        collections += Number(res.totalReceived) || 0;
+        pending += Number(res.outstanding) || 0;
+      }
     });
 
     return {
       totalSales,
       collections,
       pending,
-      count: filteredDeals.length
+      count: (filteredDeals || []).length
     };
   }, [filteredDeals, payments, vouchers]);
+
+  const [formSaleId, setFormSaleId] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState("");
+  const [selectedVehicleBrand, setSelectedVehicleBrand] = useState("");
+
+  const fetchNextSaleId = async () => {
+    try {
+      const res = await fetch("/api/deals/nextId");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.nextId) {
+          setFormSaleId(data.nextId);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch next sale ID:", e);
+    }
+    setFormSaleId(`S-${1001 + (deals?.length || 0)}`);
+  };
+
+  const handleOpenCreateModal = () => {
+    setEditingDeal(null);
+    setSelectedCustomer(null);
+    setSelectedVehicle(null);
+    setSelectedVehicleType("");
+    setSelectedVehicleBrand("");
+    setVehicleSearch("");
+    setCustomerSearch("");
+    setFormData({
+      sellingPrice: 0,
+      advanceAmount: 0,
+      expenses: 0,
+      consultancyFees: 0,
+      aadhaarNumber: "",
+      panNumber: "",
+      customerRole: "Buyer",
+      date: new Date().toISOString().split("T")[0],
+      settlementType: "Customer Balance Pending",
+      financeName: "",
+      financeRef: ""
+    });
+    fetchNextSaleId();
+    setShowCreateModal(true);
+  };
+
+  const availableVehicleTypes = useMemo(() => {
+    const types = new Set(["Four Wheeler", "Two Wheeler", "Commercial", "Three Wheeler"]);
+    (vehicles || []).forEach((v) => {
+      if (v) {
+        const t = v.vehicleType || v.vehicle_type;
+        if (t) types.add(t);
+      }
+    });
+    return Array.from(types);
+  }, [vehicles]);
+
+  const availableVehicleBrands = useMemo(() => {
+    const bSet = new Set();
+    if (Array.isArray(brands)) {
+      brands.forEach((b) => {
+        if (typeof b === "string") bSet.add(b);
+        else if (b && b.name) bSet.add(b.name);
+      });
+    }
+    (vehicles || []).forEach((v) => {
+      if (v) {
+        const b = v.brand || v.brand_id;
+        if (b) bSet.add(b);
+      }
+    });
+    return Array.from(bSet).filter(Boolean).sort();
+  }, [vehicles, brands]);
+
   const [customerSearch, setCustomerSearch] = useState("");
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -218,23 +339,63 @@ export default function Sales({
     aadhaar: null,
     pan: null
   });
-  const photoInputRef = React.useRef(null);
-  const aadhaarInputRef = React.useRef(null);
-  const panInputRef = React.useRef(null);
-  const handleFileChange = (type, e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploads((prev) => ({ ...prev, [type]: file.name }));
-    }
-  };
-  const filteredCustomers = useMemo(() => customers.filter(
-    (c) => !c.isDeleted && 
-      ((c.customer_type === "Buy" || c.requirement === "Buy" || (c.customer_type !== "Sell" && c.requirement !== "Sell")) || c.id === selectedCustomer?.id) &&
-      (c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile.includes(customerSearch) || (c.id && c.id.toLowerCase().includes(customerSearch.toLowerCase())))
-  ), [customers, customerSearch, selectedCustomer]);
-  const filteredVehicles = useMemo(() => vehicles.filter(
-    (v) => v.status === "Available" && !v.isDeleted && (v.name.toLowerCase().includes(vehicleSearch.toLowerCase()) || v.regNo.toLowerCase().includes(vehicleSearch.toLowerCase()))
-  ), [vehicles, vehicleSearch]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = (customerSearch || "").toLowerCase().trim();
+    const cleanQ = q.replace(/[^a-z0-9]/gi, "");
+    return (customers || []).filter((c) => {
+      if (!c || c.isDeleted) return false;
+      if (!q) return true;
+      const cId = String(c.id || c.customer_id || "").toLowerCase();
+      const cleanId = cId.replace(/[^a-z0-9]/gi, "");
+      const name = String(c.name || c.customer_name || "").toLowerCase();
+      const mobile = String(c.mobile || c.customer_mobile || "").toLowerCase();
+      return (
+        name.includes(q) ||
+        mobile.includes(q) ||
+        cId.includes(q) ||
+        (cleanQ && cleanId.includes(cleanQ))
+      );
+    });
+  }, [customers, customerSearch]);
+
+  const filteredVehicles = useMemo(() => {
+    return (vehicles || []).filter((v) => {
+      if (!v || v.isDeleted) return false;
+      const isAvailable = v.status === "Available" || (editingDeal && (v.id === editingDeal.vehicleId || v.purchase_id === editingDeal.vehicleId));
+      if (!isAvailable) return false;
+
+      const vType = String(v.vehicleType || v.vehicle_type || "").trim();
+      if (selectedVehicleType && vType.toLowerCase() !== selectedVehicleType.toLowerCase()) return false;
+
+      const vBrand = String(v.brand || v.brand_id || "").trim();
+      if (selectedVehicleBrand && vBrand.toLowerCase() !== selectedVehicleBrand.toLowerCase()) return false;
+
+      if (!vehicleSearch || !vehicleSearch.trim()) return true;
+      const q = vehicleSearch.toLowerCase().trim();
+      const cleanQ = q.replace(/[^a-z0-9]/gi, "");
+      const vId = String(v.id || v.purchase_id || v.purchaseNo || "").toLowerCase();
+      const cleanId = vId.replace(/[^a-z0-9]/gi, "");
+      const nameStr = String(v.name || v.vehicle_name || v.vehicle_name_id || "").toLowerCase();
+      const regStr = String(v.regNo || v.reg_no || "").toLowerCase();
+      const cleanReg = regStr.replace(/[^a-z0-9]/gi, "");
+      const brandStr = vBrand.toLowerCase();
+      const typeStr = vType.toLowerCase();
+      const fuelStr = String(v.fuelType || v.fuel_type || "").toLowerCase();
+      const yearStr = String(v.year || v.model_details || "").toLowerCase();
+
+      return (
+        nameStr.includes(q) ||
+        regStr.includes(q) ||
+        vId.includes(q) ||
+        brandStr.includes(q) ||
+        typeStr.includes(q) ||
+        fuelStr.includes(q) ||
+        yearStr.includes(q) ||
+        (cleanQ && (cleanId.includes(cleanQ) || cleanReg.includes(cleanQ)))
+      );
+    });
+  }, [vehicles, vehicleSearch, selectedVehicleType, selectedVehicleBrand, editingDeal]);
   const totalPrice = Number(formData.sellingPrice || 0) + Number(formData.consultancyFees || 0);
   const balanceAmount = Math.max(0, totalPrice - Number(formData.advanceAmount || 0));
   const purchasePrice = selectedVehicle ? Number(selectedVehicle.purchasePrice || selectedVehicle.purchase_price) || 0 : 0;
@@ -248,7 +409,7 @@ export default function Sales({
   const profitMarginPercent = totalVehicleCost > 0 ? ((netProfit / totalVehicleCost) * 100).toFixed(2) : "0.00";
   const handleQuickAddCustomer = async () => {
     if (!newCustomerName.trim() || !newCustomerMobile.trim()) {
-      alert("Please enter Name and Mobile for quick customer creation");
+      alert("Please enter Customer Name and Mobile Number for quick customer creation");
       return;
     }
     const generatedId = `CUS-${Date.now().toString().slice(-4)}`;
@@ -256,15 +417,17 @@ export default function Sales({
       id: generatedId,
       name: newCustomerName.trim(),
       mobile: newCustomerMobile.trim(),
-      city: newCustomerCity.trim() || "Default City",
+      city: newCustomerCity.trim() || "Coimbatore",
       area: newCustomerArea.trim(),
       subArea: newCustomerSubArea.trim(),
       address: newCustomerAddress.trim(),
       customer_type: "Buy",
       requirement: "Buy",
+      status: "Direct Sales Buyer",
+      branch: currentUser?.branch || "Coimbatore",
       isDeleted: false,
-      createdBy: "Admin",
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      createdBy: currentUser?.name || "Admin",
+      createdAt: new Date().toISOString()
     };
     try {
       const res = await fetch("/api/customers", {
@@ -278,6 +441,7 @@ export default function Sales({
         if (onUpdateCustomers) {
           onUpdateCustomers((prev) => [...prev, saved]);
         }
+        if (onRefreshData) onRefreshData();
         setSelectedCustomer(saved);
         setCustomerFlow("existing");
         setNewCustomerName("");
@@ -286,6 +450,7 @@ export default function Sales({
         setNewCustomerArea("");
         setNewCustomerSubArea("");
         setNewCustomerAddress("");
+        alert(`Customer "${saved.name || newCustomerName.trim()}" created successfully and selected as buyer!`);
       } else {
         if (onUpdateCustomers) {
           onUpdateCustomers((prev) => [...prev, newCust]);
@@ -293,7 +458,8 @@ export default function Sales({
         setSelectedCustomer(newCust);
         setCustomerFlow("existing");
       }
-    } catch {
+    } catch (err) {
+      console.error("[Quick Add Customer Error]", err);
       if (onUpdateCustomers) {
         onUpdateCustomers((prev) => [...prev, newCust]);
       }
@@ -317,6 +483,8 @@ export default function Sales({
       if (editingDeal) {
         const updatedDeal = {
           ...editingDeal,
+          id: formSaleId ? formSaleId.trim() : editingDeal.id,
+          deal_id: formSaleId ? formSaleId.trim() : (editingDeal.deal_id || editingDeal.id),
           customerId: selectedCustomer.id,
           customerName: selectedCustomer.name,
           vehicleId: selectedVehicle.id,
@@ -378,6 +546,8 @@ export default function Sales({
 
       } else {
         const payload = {
+          id: formSaleId ? formSaleId.trim() : undefined,
+          deal_id: formSaleId ? formSaleId.trim() : undefined,
           customerId: selectedCustomer.id,
           customerName: selectedCustomer.name,
           vehicleId: selectedVehicle.id,
@@ -493,7 +663,7 @@ export default function Sales({
           </button>
           {hasModulePermission(currentUser, "sales", "create") && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={handleOpenCreateModal}
               className="flex items-center justify-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 cursor-pointer"
             >
               <Plus size={20} />
@@ -1018,9 +1188,28 @@ export default function Sales({
         {showCreateModal && <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-2 sm:p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCreateModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-slate-900">Create New Sale</h3>
-                <button onClick={() => setShowCreateModal(false)} className="p-2 text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-xl font-extrabold text-slate-900">
+                    {editingDeal ? "Edit Sale Record" : "Create New Sale"}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Link buyer customer and vehicle details to record sale</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl">
+                    <label className="text-xs font-bold text-brand-800 uppercase tracking-wider whitespace-nowrap">Sales ID:</label>
+                    <input
+                      type="text"
+                      value={formSaleId || ""}
+                      onChange={(e) => setFormSaleId(e.target.value)}
+                      className="w-28 sm:w-36 px-2 py-0.5 bg-white border border-brand-300 rounded-lg text-sm font-black text-brand-900 font-mono focus:ring-2 focus:ring-brand-500 outline-none"
+                      placeholder="S-1001"
+                    />
+                  </div>
+                  <button onClick={() => setShowCreateModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6">
@@ -1028,88 +1217,300 @@ export default function Sales({
                   {
     /* Customer Search */
   }
-                  <div className="space-y-2 relative md:col-span-1">
-                    <label className="text-sm font-bold text-slate-700">Customer ID / Selection</label>
-                    {selectedCustomer ? <div className="flex flex-col p-3 bg-brand-50 border border-brand-200 rounded-xl space-y-2 text-left">
+                  {/* Customer Contact Selector (Existing vs Direct Add Customer) */}
+                  <div className="space-y-3 relative md:col-span-2 bg-brand-50/40 p-4 rounded-xl border border-brand-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-brand-900 uppercase tracking-widest">Customer Contact Selector</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">Select existing customer or add direct entry</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => setCustomerFlow("existing")}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer",
+                            customerFlow === "existing" ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+                          )}
+                        >
+                          Existing Customer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomerFlow("new");
+                            setShowCustomerModal(true);
+                          }}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer",
+                            customerFlow === "new" ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+                          )}
+                        >
+                          + Direct Add Customer
+                        </button>
+                      </div>
+                    </div>
+
+                    {customerFlow === "existing" ? (
+                      selectedCustomer ? (
+                        <div className="flex flex-col p-3.5 bg-white border border-brand-200 rounded-xl space-y-2 text-left shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-bold text-brand-700">Customer ID: {selectedCustomer.id || selectedCustomer.customer_id}</p>
+                              <p className="text-sm font-bold text-slate-800">
+                                {selectedCustomer.name || selectedCustomer.customer_name} <span className="text-xs font-bold text-brand-600">({selectedCustomer.role || "Buyer"})</span>
+                              </p>
+                              <p className="text-xs text-slate-600">Mobile: {selectedCustomer.mobile || selectedCustomer.customer_mobile}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomer(null)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Change Customer"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <div className="border-t border-slate-100 pt-1.5 space-y-1 text-xs text-slate-700">
+                            <p><span className="font-bold text-slate-500">Address:</span> {selectedCustomer.address || "N/A"}</p>
+                            <div className="grid grid-cols-3 gap-1 mt-1 text-[10px] font-semibold text-slate-600">
+                              <div><span className="text-slate-400">City:</span> {selectedCustomer.city || selectedCustomer.cityId || "N/A"}</div>
+                              <div><span className="text-slate-400">Area:</span> {selectedCustomer.area || selectedCustomer.areaId || "N/A"}</div>
+                              <div><span className="text-slate-400">Sub Area:</span> {selectedCustomer.subArea || selectedCustomer.subAreaId || "N/A"}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-extrabold text-brand-800 uppercase tracking-widest block mb-1">Search Customer</label>
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                  type="text"
+                                  value={customerSearch}
+                                  onChange={(e) => setCustomerSearch(e.target.value)}
+                                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-bold text-slate-800"
+                                  placeholder="Search by ID, name, or phone..."
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-extrabold text-brand-800 uppercase tracking-widest block mb-1">Choose Dropdown</label>
+                              <select
+                                value={selectedCustomer?.id || ""}
+                                onChange={(e) => {
+                                  const found = customers.find((c) => (c.id || c.customer_id) === e.target.value);
+                                  if (found) setSelectedCustomer(found);
+                                }}
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs font-bold text-slate-700"
+                              >
+                                <option value="">-- Choose Existing Customer --</option>
+                                {customers
+                                  .filter((c) => !c.isDeleted)
+                                  .map((c) => (
+                                    <option key={c.id || c.customer_id} value={c.id || c.customer_id}>
+                                      {c.id || c.customer_id} - {c.name || c.customer_name} ({c.mobile || c.customer_mobile || "No Mobile"})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {customerSearch && (
+                            <div className="z-20 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                              {filteredCustomers.map((c) => (
+                                <button
+                                  key={c.id || c.customer_id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCustomer(c);
+                                    setCustomerSearch("");
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-brand-50 text-xs border-b border-slate-100 last:border-0 transition-colors"
+                                >
+                                  <p className="font-bold text-slate-900">ID: {c.id || c.customer_id} - {c.name || c.customer_name}</p>
+                                  <p className="text-[11px] text-slate-500">{c.mobile || c.customer_mobile} • {c.address || c.city || "N/A"}</p>
+                                </button>
+                              ))}
+                              {filteredCustomers.length === 0 && (
+                                <div className="p-3 text-center text-xs text-slate-400 font-bold">No matching customers. Switch to "+ Direct Add Customer" to create.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      <div className="space-y-3 bg-white p-4 rounded-xl border border-brand-300 shadow-sm text-center">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-brand-700">Customer ID: {selectedCustomer.id}</p>
-                            <p className="text-sm font-bold text-slate-800">{selectedCustomer.name} <span className="text-xs font-bold text-brand-600">({selectedCustomer.role || "Buyer"})</span></p>
-                            <p className="text-xs text-slate-600">Mobile: {selectedCustomer.mobile}</p>
-                          </div>
-                          <button onClick={() => setSelectedCustomer(null)} className="p-1 text-slate-400 hover:text-red-500 transition-colors"><X size={16} /></button>
+                          <span className="text-xs font-extrabold text-brand-900 uppercase tracking-wider">Direct Customer Entry</span>
+                          <span className="text-[10px] text-brand-700 font-medium">Full customer profile form with documents & photo verification</span>
                         </div>
-                        <div className="border-t border-brand-100 pt-1.5 space-y-1 text-xs text-slate-700">
-                          <p><span className="font-bold text-slate-500">Address:</span> {selectedCustomer.address || "N/A"}</p>
-                          <div className="grid grid-cols-3 gap-1 mt-1 text-[10px] font-semibold text-slate-600">
-                            <div><span className="text-slate-400">City:</span> {selectedCustomer.city || selectedCustomer.cityId || "N/A"}</div>
-                            <div><span className="text-slate-400">Area:</span> {selectedCustomer.area || selectedCustomer.areaId || "N/A"}</div>
-                            <div><span className="text-slate-400">Sub Area:</span> {selectedCustomer.subArea || selectedCustomer.subAreaId || "N/A"}</div>
-                          </div>
+                        <p className="text-xs text-slate-600 font-medium my-2">
+                          Create a new buyer customer lead with all 16 fields (Aadhaar, PAN, Photos, Location Master) and link directly to this sale.
+                        </p>
+                        <div className="flex justify-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setCustomerFlow("existing")}
+                            className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomerModal(true)}
+                            className="px-5 py-2 bg-brand-600 text-white rounded-xl font-bold text-xs hover:bg-brand-700 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                          >
+                            <Plus size={16} /> Open Customer Entry Form
+                          </button>
                         </div>
-                      </div> : <>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                          <input type="text" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Search customer ID, name, or phone..." />
-                        </div>
-                        {customerSearch && <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
-                            {filteredCustomers.map((c) => <button key={c.id} onClick={() => {
-    setSelectedCustomer(c);
-    setCustomerSearch("");
-  }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm border-b border-slate-100 last:border-0">
-                                <p className="font-bold text-slate-900">ID: {c.id} - {c.name}</p>
-                                <p className="text-xs text-slate-500">{c.mobile} • {c.address || c.city || "N/A"}</p>
-                              </button>)}
-                          </div>}
-                      </>}
+                      </div>
+                    )}
                   </div>
 
-                  {
-    /* Vehicle Search */
-  }
-                  <div className="space-y-2 relative md:col-span-1">
-                    <label className="text-sm font-bold text-slate-700">Vehicle</label>
-                    {selectedVehicle ? <div className="flex items-center justify-between p-3 bg-brand-50 border border-brand-200 rounded-xl">
-                        <div>
-                          <p className="text-sm font-bold text-brand-900">{selectedVehicle.name}</p>
-                          <p className="text-[10px] text-brand-600">
-                            Purchase: ₹{(Number(selectedVehicle.purchasePrice || selectedVehicle.purchase_price) || 0).toLocaleString("en-IN")} • Preset Sales Price: ₹{(Number(selectedVehicle.salesPrice || selectedVehicle.sales_price || selectedVehicle.expectedSellingPrice || selectedVehicle.expected_selling_price || selectedVehicle.offerPrice || selectedVehicle.offer_price || (Number(selectedVehicle.sellingPrice) > 0 ? selectedVehicle.sellingPrice : 0) || (Number(selectedVehicle.selling_price) > 0 ? selectedVehicle.selling_price : 0)) || 0).toLocaleString("en-IN")}
-                          </p>
-                        </div>
-                        <button onClick={() => setSelectedVehicle(null)} className="p-1 text-brand-400 hover:text-brand-600"><X size={14} /></button>
-                      </div> : <>
+                  {/* Vehicle Search & Filters */}
+                  <div className="space-y-3 relative md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Vehicle Selector & Filter</h4>
+                        <p className="text-[10px] text-slate-500 font-medium">Filter available stock by Vehicle Type, Brand, or Registration Number</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Vehicle Type</label>
+                        <select
+                          value={selectedVehicleType}
+                          onChange={(e) => setSelectedVehicleType(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                          <option value="">-- All Vehicle Types --</option>
+                          {availableVehicleTypes.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Brand</label>
+                        <select
+                          value={selectedVehicleBrand}
+                          onChange={(e) => setSelectedVehicleBrand(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                          <option value="">-- All Brands --</option>
+                          {availableVehicleBrands.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-1">Search Reg / Model</label>
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                          <input type="text" value={vehicleSearch} onChange={(e) => setVehicleSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Search vehicle..." />
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                          <input
+                            type="text"
+                            value={vehicleSearch}
+                            onChange={(e) => setVehicleSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500"
+                            placeholder="Search Reg No, Name..."
+                          />
                         </div>
-                        {vehicleSearch && <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
-                            {filteredVehicles.map((v) => <button key={v.id} onClick={() => {
-    setSelectedVehicle(v);
-    setVehicleSearch("");
-    const offerVal = Number(
-      v.salesPrice ||
-      v.sales_price ||
-      v.expectedSellingPrice ||
-      v.expected_selling_price ||
-      v.offerPrice ||
-      v.offer_price ||
-      (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) ||
-      (Number(v.selling_price) > 0 ? v.selling_price : 0)
-    ) || 0;
-    setFormData((prev) => ({
-      ...prev,
-      sellingPrice: offerVal,
-      expenses: Number(v.totalExpenses || v.expenses) || 0,
-      consultancyFees: Number(v.consultancyFees || v.consultancy_fees) || 0
-    }));
-  }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm border-b border-slate-100 last:border-0">
-                                <p className="font-bold text-slate-900">{v.name}</p>
-                                <p className="text-xs text-slate-500">
-                                  {v.brand} • {v.year} • Sales Price: ₹{(Number(v.salesPrice || v.sales_price || v.expectedSellingPrice || v.expected_selling_price || v.offerPrice || v.offer_price || (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) || (Number(v.selling_price) > 0 ? v.selling_price : 0)) || 0).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+
+                    {selectedVehicle ? (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white border border-brand-300 rounded-xl gap-3 shadow-sm">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black bg-brand-600 text-white px-2 py-0.5 rounded font-mono">
+                              {selectedVehicle.regNo || selectedVehicle.reg_no || "NO REG"}
+                            </span>
+                            <h4 className="text-sm font-extrabold text-slate-900">{selectedVehicle.name || selectedVehicle.vehicle_name}</h4>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span><strong className="text-slate-400">Type:</strong> {selectedVehicle.vehicleType || selectedVehicle.vehicle_type || "N/A"}</span>
+                            <span><strong className="text-slate-400">Brand:</strong> {selectedVehicle.brand || selectedVehicle.brand_id || "N/A"}</span>
+                            <span><strong className="text-slate-400">Year:</strong> {selectedVehicle.year || selectedVehicle.model_details || "N/A"}</span>
+                            <span><strong className="text-slate-400">Fuel:</strong> {selectedVehicle.fuelType || selectedVehicle.fuel_type || "Petrol"}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-brand-700 font-bold pt-1">
+                            <span>Purchase Price: ₹{(Number(selectedVehicle.purchasePrice || selectedVehicle.purchase_price) || 0).toLocaleString("en-IN")}</span>
+                            <span>•</span>
+                            <span>Preset Sales Price: ₹{(Number(selectedVehicle.salesPrice || selectedVehicle.sales_price || selectedVehicle.expectedSellingPrice || selectedVehicle.expected_selling_price || selectedVehicle.offerPrice || selectedVehicle.offer_price || (Number(selectedVehicle.sellingPrice) > 0 ? selectedVehicle.sellingPrice : 0) || (Number(selectedVehicle.selling_price) > 0 ? selectedVehicle.selling_price : 0)) || 0).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVehicle(null)}
+                          className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 cursor-pointer self-end sm:self-center"
+                          title="Change Vehicle"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Available Vehicles ({filteredVehicles.length})</label>
+                          <span className="text-[10px] text-slate-400">Click to select vehicle</span>
+                        </div>
+                        <div className="w-full bg-white border border-slate-200 rounded-xl shadow-inner max-h-52 overflow-y-auto divide-y divide-slate-100">
+                          {filteredVehicles.map((v) => (
+                            <button
+                              key={v.id || v.purchase_id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedVehicle(v);
+                                setVehicleSearch("");
+                                const offerVal = Number(
+                                  v.salesPrice ||
+                                  v.sales_price ||
+                                  v.expectedSellingPrice ||
+                                  v.expected_selling_price ||
+                                  v.offerPrice ||
+                                  v.offer_price ||
+                                  (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) ||
+                                  (Number(v.selling_price) > 0 ? v.selling_price : 0)
+                                ) || 0;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sellingPrice: offerVal,
+                                  expenses: Number(v.totalExpenses || v.expenses) || 0,
+                                  consultancyFees: Number(v.consultancyFees || v.consultancy_fees) || 0
+                                }));
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-brand-50 text-xs transition-colors flex items-center justify-between group"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200 group-hover:bg-brand-100 group-hover:text-brand-800">
+                                    {v.regNo || v.reg_no || "NO REG"}
+                                  </span>
+                                  <span className="font-extrabold text-slate-900 text-sm group-hover:text-brand-900">{v.name || v.vehicle_name}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                  Type: <strong className="text-slate-700">{v.vehicleType || v.vehicle_type || "N/A"}</strong> • Brand: <strong className="text-slate-700">{v.brand || v.brand_id || "N/A"}</strong> • Year: {v.year || v.model_details || "N/A"} • Fuel: {v.fuelType || v.fuel_type || "Petrol"}
                                 </p>
-                              </button>)}
-                          </div>}
-                      </>}
+                              </div>
+                              <div className="text-right pl-3">
+                                <p className="font-extrabold text-brand-700 text-sm">
+                                  ₹{(Number(v.salesPrice || v.sales_price || v.expectedSellingPrice || v.expected_selling_price || v.offerPrice || v.offer_price || (Number(v.sellingPrice) > 0 ? v.sellingPrice : 0) || (Number(v.selling_price) > 0 ? v.selling_price : 0)) || 0).toLocaleString("en-IN")}
+                                </p>
+                                <p className="text-[10px] text-slate-400">Purchase: ₹{(Number(v.purchasePrice || v.purchase_price) || 0).toLocaleString("en-IN")}</p>
+                              </div>
+                            </button>
+                          ))}
+                          {filteredVehicles.length === 0 && (
+                            <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                              No available vehicles match the selected filters.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1344,6 +1745,35 @@ export default function Sales({
           setShowPosterModal(false);
           setPosterVehicle(null);
           setPosterDeal(null);
+        }}
+      />
+      {/* Customer Form Modal for Direct Customer Add */}
+      <CustomerFormModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        currentUser={currentUser}
+        defaultType="Buy"
+        onSuccess={(savedCustomer) => {
+          const normalized = {
+            id: savedCustomer.customer_id || savedCustomer.id,
+            customer_id: savedCustomer.customer_id || savedCustomer.id,
+            name: savedCustomer.customer_name || savedCustomer.name,
+            customer_name: savedCustomer.customer_name || savedCustomer.name,
+            mobile: savedCustomer.customer_mobile || savedCustomer.mobile,
+            customer_mobile: savedCustomer.customer_mobile || savedCustomer.mobile,
+            address: savedCustomer.address || "",
+            city: savedCustomer.city || savedCustomer.city_id || "",
+            area: savedCustomer.area || savedCustomer.area_id || "",
+            subArea: savedCustomer.subArea || savedCustomer.sub_area_id || "",
+            ...savedCustomer
+          };
+          if (onUpdateCustomers) {
+            onUpdateCustomers((prev) => [normalized, ...(prev || []).filter((c) => (c.id || c.customer_id) !== normalized.id)]);
+          }
+          if (onRefreshData) onRefreshData();
+          setSelectedCustomer(normalized);
+          setCustomerFlow("existing");
+          setShowCustomerModal(false);
         }}
       />
     </div>;

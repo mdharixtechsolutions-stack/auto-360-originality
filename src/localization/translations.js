@@ -1,4 +1,4 @@
-// AUTO360 Localization Dictionary for English, Tamil, Hindi, Telugu, Malayalam, and Kannada
+// AUTO 360 Localization Dictionary for English, Tamil, Hindi, Telugu, Malayalam, and Kannada
 const translations = {
   en: {
     // Modules & Navigation
@@ -212,8 +212,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "Hello *{customer}*, here are your document details for *{ref}*. Total: *{amount}*. Thank you!",
-    "sms_template": "Dear {customer}, your document {ref} of {amount} has been generated. AUTO360",
-    "email_template": "Dear {customer},\n\nPlease find attached the document {ref} for {amount}.\n\nBest Regards,\nAUTO360 Team"
+    "sms_template": "Dear {customer}, your document {ref} of {amount} has been generated. AUTO 360",
+    "email_template": "Dear {customer},\n\nPlease find attached the document {ref} for {amount}.\n\nBest Regards,\nAUTO 360 Team"
   },
   ta: {
     // Modules & Navigation
@@ -427,8 +427,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "வணக்கம் *{customer}*, உங்கள் *{ref}* ஆவண விவரங்கள் இதோ. மொத்தம்: *{amount}*. நன்றி!",
-    "sms_template": "அன்பான {customer}, உங்கள் {ref} தொகை {amount} ஆவணம் உருவாக்கப்பட்டுள்ளது. AUTO360",
-    "email_template": "அன்பான {customer},\n\nஉங்கள் {ref} தொகை {amount} ஆவணம் இத்துடன் இணைக்கப்பட்டுள்ளது.\n\nவாழ்த்துகளுடன்,\nAUTO360 குழு"
+    "sms_template": "அன்பான {customer}, உங்கள் {ref} தொகை {amount} ஆவணம் உருவாக்கப்பட்டுள்ளது. AUTO 360",
+    "email_template": "அன்பான {customer},\n\nஉங்கள் {ref} தொகை {amount} ஆவணம் இத்துடன் இணைக்கப்பட்டுள்ளது.\n\nவாழ்த்துகளுடன்,\nAUTO 360 குழு"
   },
   hi: {
     // Modules & Navigation
@@ -642,8 +642,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "नमस्ते *{customer}*, आपके *{ref}* के दस्तावेज़ विवरण यहाँ हैं। कुल: *{amount}*। धन्यवाद!",
-    "sms_template": "प्रिय {customer}, आपका दस्तावेज़ {ref} मूल्य {amount} तैयार हो गया है। AUTO360",
-    "email_template": "प्रिय {customer},\n\nकृपया {amount} मूल्य के लिए संलग्न दस्तावेज़ {ref} प्राप्त करें।\n\nसादर,\nAUTO360 टीम"
+    "sms_template": "प्रिय {customer}, आपका दस्तावेज़ {ref} मूल्य {amount} तैयार हो गया है। AUTO 360",
+    "email_template": "प्रिय {customer},\n\nकृपया {amount} मूल्य के लिए संलग्न दस्तावेज़ {ref} प्राप्त करें।\n\nसादर,\nAUTO 360 टीम"
   },
   te: {
     // Modules & Navigation
@@ -857,8 +857,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "నమస్తే *{customer}*, మీ *{ref}* పత్రం వివరాలు ఇక్కడ ఉన్నాయి. మొత్తం: *{amount}*. ధన్యవాదాలు!",
-    "sms_template": "ప్రియమైన {customer}, మీ డాక్యుమెంట్ {ref} విలువ {amount} రూపొందించబడింది. AUTO360",
-    "email_template": "ప్రియమైన {customer},\n\nదయచేసి మీ {ref} పత్రం విలువ {amount} జతచేయబడిన ఫైల్ లో చూడండి.\n\nభవదీయులు,\nAUTO360 బృందం"
+    "sms_template": "ప్రియమైన {customer}, మీ డాక్యుమెంట్ {ref} విలువ {amount} రూపొందించబడింది. AUTO 360",
+    "email_template": "ప్రియమైన {customer},\n\nదయచేసి మీ {ref} పత్రం విలువ {amount} జతచేయబడిన ఫైల్ లో చూడండి.\n\nభవదీయులు,\nAUTO 360 బృందం"
   },
   ml: {
     // Modules & Navigation
@@ -1072,8 +1072,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "ഹലോ *{customer}*, നിങ്ങളുടെ *{ref}* രേഖയുടെ വിവരങ്ങൾ ഇതാ. ആകെ തുക: *{amount}*. നന്ദി!",
-    "sms_template": "പ്രിയപ്പെട്ട {customer}, നിങ്ങളുടെ രേഖ {ref} തുക {amount} തയ്യാറായിട്ടുണ്ട്. AUTO360",
-    "email_template": "പ്രിയപ്പെട്ട {customer},\n\nനിങ്ങളുടെ {ref} തുക {amount} രേഖ ഇതോടൊപ്പം അയക്കുന്നു.\n\nവിശ്വസ്തതയോടെ,\nAUTO360 ടീം"
+    "sms_template": "പ്രിയപ്പെട്ട {customer}, നിങ്ങളുടെ രേഖ {ref} തുക {amount} തയ്യാറായിട്ടുണ്ട്. AUTO 360",
+    "email_template": "പ്രിയപ്പെട്ട {customer},\n\nനിങ്ങളുടെ {ref} തുക {amount} രേഖ ഇതോടൊപ്പം അയക്കുന്നു.\n\nവിശ്വസ്തതയോടെ,\nAUTO 360 ടീം"
   },
   kn: {
     // Modules & Navigation
@@ -1287,8 +1287,8 @@ const translations = {
 
     // Templates
     "whatsapp_template": "ನಮಸ್ತೆ *{customer}*, ನಿಮ್ಮ *{ref}* ದಾಖಲೆಯ ವಿವರಗಳು ಇಲ್ಲಿವೆ. ಒಟ್ಟು: *{amount}*. ಧನ್ಯವಾದಗಳು!",
-    "sms_template": "ಆತ್ಮೀಯ {customer}, ನಿಮ್ಮ ದಾಖಲೆ {ref} ಮೌಲ್ಯ {amount} ಸಿದ್ಧವಾಗಿದೆ. AUTO360",
-    "email_template": "ಆತ್ಮೀಯ {customer},\n\nದಯವಿಟ್ಟು ನಿಮ್ಮ {ref} ದಾಖಲೆಯ ಮೌಲ್ಯ {amount} ಲಗತ್ತಿಸಲಾದ ಫೈಲ್‌ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ.\n\nಇಂತಿ ನಿಮ್ಮ,\nAUTO360 ತಂಡ"
+    "sms_template": "ಆತ್ಮೀಯ {customer}, ನಿಮ್ಮ ದಾಖಲೆ {ref} ಮೌಲ್ಯ {amount} ಸಿದ್ಧವಾಗಿದೆ. AUTO 360",
+    "email_template": "ಆತ್ಮೀಯ {customer},\n\nದಯವಿಟ್ಟು ನಿಮ್ಮ {ref} ದಾಖಲೆಯ ಮೌಲ್ಯ {amount} ಲಗತ್ತಿಸಲಾದ ಫೈಲ್‌ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ.\n\nಇಂತಿ ನಿಮ್ಮ,\nAUTO 360 ತಂಡ"
   }
 };
 

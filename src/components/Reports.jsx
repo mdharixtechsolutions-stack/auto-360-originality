@@ -461,7 +461,7 @@ export default function Reports({
 
       let modelName = v.model_details || v.name || "General";
       const type = v.vehicleType || v.vehicle_type || "Four Wheeler";
-      const branchName = v.branch || "Coimbatore";
+      const branchName = v.branch || "Tiruppur";
 
       // Apply branch filter
       if (!matchesBranch(branchName)) return;
@@ -613,7 +613,7 @@ export default function Reports({
         dueDate,
         overdueDays,
         status: statusVal,
-        branch: deal.branch || "Coimbatore",
+        branch: deal.branch || "Tiruppur",
         customerId: deal.customerId,
         vehicleId: deal.vehicleId
       };
@@ -708,7 +708,7 @@ export default function Reports({
         disbursedAmount,
         pendingDisbursement,
         status,
-        branch: deal.branch || "Coimbatore",
+        branch: deal.branch || "Tiruppur",
         customerId: deal.customerId,
         vehicleId: deal.vehicleId
       };
@@ -795,7 +795,7 @@ export default function Reports({
         dueDate,
         overdueDays,
         status: stats.status,
-        branch: p.branch || "Coimbatore",
+        branch: p.branch || "Tiruppur",
         supplierId: p.supplier_id,
         vehicleId: p.purchase_id || p.id
       };
@@ -896,7 +896,7 @@ export default function Reports({
         dueDate,
         overdueDays,
         status: stats.status,
-        branch: p.branch || "Coimbatore",
+        branch: p.branch || "Tiruppur",
         customerId: p.sellerId || p.seller_id,
         vehicleId: p.purchase_id || p.id
       };
@@ -968,7 +968,7 @@ export default function Reports({
           paymentMode: deal.paymentMode || deal.mode || "Cash",
           status: pending === 0 ? "Paid" : (received > 0 ? "Partially Paid" : "Pending"),
           remarks: deal.remarks || deal.narration || "Consultancy fee deal",
-          branch: deal.branch || "Coimbatore",
+          branch: deal.branch || "Tiruppur",
           customerId: deal.customerId,
           vehicleId: deal.vehicleId
         });
@@ -999,7 +999,7 @@ export default function Reports({
           paymentMode: p.paymentMode || "Cash",
           status: pending === 0 ? "Paid" : (received > 0 ? "Partially Paid" : "Pending"),
           remarks: p.remarks || "Vehicle consultancy charge",
-          branch: p.branch || "Coimbatore",
+          branch: p.branch || "Tiruppur",
           customerId: p.sellerId,
           vehicleId: p.purchase_id || p.id
         });
@@ -1040,7 +1040,7 @@ export default function Reports({
     if (phoneNum.length === 10) {
       phoneNum = "91" + phoneNum;
     }
-    const message = `Dear ${row.customerName},\n\nThis is a payment reminder regarding your vehicle invoice at AUTO360 ERP.\n\n*Invoice No:* ${row.invoiceNumber}\n*Vehicle:* ${row.vehicleNumber}\n*Invoice Date:* ${row.invoiceDate}\n*Total Invoice Amount:* ₹${row.totalInvoiceAmount.toLocaleString("en-IN")}\n*Amount Received:* ₹${row.amountReceived.toLocaleString("en-IN")}\n*Outstanding Balance:* ₹${row.outstandingAmount.toLocaleString("en-IN")}\n*Due Date:* ${row.dueDate}\n*Overdue:* ${row.overdueDays} Days\n\nKindly arrange for payment at your earliest convenience. Thank you!`;
+    const message = `Dear ${row.customerName},\n\nThis is a payment reminder regarding your vehicle invoice at AUTO 360 ERP.\n\n*Invoice No:* ${row.invoiceNumber}\n*Vehicle:* ${row.vehicleNumber}\n*Invoice Date:* ${row.invoiceDate}\n*Total Invoice Amount:* ₹${row.totalInvoiceAmount.toLocaleString("en-IN")}\n*Amount Received:* ₹${row.amountReceived.toLocaleString("en-IN")}\n*Outstanding Balance:* ₹${row.outstandingAmount.toLocaleString("en-IN")}\n*Due Date:* ${row.dueDate}\n*Overdue:* ${row.overdueDays} Days\n\nKindly arrange for payment at your earliest convenience. Thank you!`;
 
     const url = `https://api.whatsapp.com/send?phone=${phoneNum}&text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
@@ -1070,7 +1070,7 @@ export default function Reports({
   };
   const getBranchWiseStock = () => {
     const counts = {};
-    const yards = branches.length > 0 ? branches.map((b) => b.name) : ["Coimbatore", "Salem", "Erode", "Chennai"];
+    const yards = branches.length > 0 ? branches.map((b) => b.name) : ["Tiruppur"];
     yards.forEach((y) => {
       counts[y] = { total: 0, available: 0, sold: 0 };
     });
@@ -1078,7 +1078,7 @@ export default function Reports({
       if (v.isDeleted) return;
       if (vehicleTypeFilter !== "All" && v.vehicleType !== vehicleTypeFilter) return;
       if (brandFilter !== "All" && v.brand !== brandFilter) return;
-      const key = v.branch || "Coimbatore";
+      const key = v.branch || "Tiruppur";
       if (!counts[key]) {
         counts[key] = { total: 0, available: 0, sold: 0 };
       }
@@ -1104,7 +1104,7 @@ export default function Reports({
       if (vehicleTypeFilter !== "All" && vehicle?.vehicleType !== vehicleTypeFilter) return;
       if (brandFilter !== "All" && vehicle?.brand !== brandFilter) return;
       if (d.date < dateRange.from || d.date > dateRange.to) return;
-      const key = d.branch || "Coimbatore";
+      const key = d.branch || "Tiruppur";
       if (!counts[key]) counts[key] = { count: 0, amount: 0, profit: 0 };
       const saleVal = Number(d.totalPrice) || (Number(d.sellingPrice || 0) + Number(d.consultancyFees || 0));
       counts[key].count += 1;
@@ -1130,7 +1130,7 @@ export default function Reports({
       if (brandFilter !== "All" && v.brand !== brandFilter) return;
       const dateStr = v.createdAt ? new Date(v.createdAt).toISOString().split("T")[0] : "";
       if (dateStr && (dateStr < dateRange.from || dateStr > dateRange.to)) return;
-      const key = v.branch || "Coimbatore";
+      const key = v.branch || "Tiruppur";
       if (!counts[key]) counts[key] = { count: 0, amount: 0 };
       counts[key].count += 1;
       counts[key].amount += v.purchasePrice || 0;
@@ -1219,11 +1219,11 @@ export default function Reports({
         break;
       case "purchase":
         headers = ["Purchase ID", "Date", "Supplier", "Vehicle", "Purchase Amount", "Branch"];
-        rows = getFilteredPurchases().map((v) => [`PRC-${(v.id || "").toString().substring(0, 6).toUpperCase()}`, v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "N/A", v.sellerName || "Direct Vendor", v.name, v.purchasePrice, v.branch || "Coimbatore"]);
+        rows = getFilteredPurchases().map((v) => [`PRC-${(v.id || "").toString().substring(0, 6).toUpperCase()}`, v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "N/A", v.sellerName || "Direct Vendor", v.name, v.purchasePrice, v.branch || "Tiruppur"]);
         break;
       case "customer":
         headers = ["Customer ID", "Customer Name", "Mobile", "City", "Branch"];
-        rows = getFilteredCustomers().map((c) => [(c.id || "").toString().substring(0, 6).toUpperCase(), c.name, c.mobile, c.address || "N/A", c.branch || "Coimbatore"]);
+        rows = getFilteredCustomers().map((c) => [(c.id || "").toString().substring(0, 6).toUpperCase(), c.name, c.mobile, c.address || "N/A", c.branch || "Tiruppur"]);
         break;
       case "expense":
         headers = ["Expense Date", "Vehicle", "Expense Type", "Amount", "Branch"];
@@ -1234,24 +1234,24 @@ export default function Reports({
         break;
       case "inventory":
         headers = ["Vehicle", "Registration No", "Purchase Price", "Total Expenses", "Status", "Branch"];
-        rows = getFilteredPurchases().map((v) => [v.name, v.regNo, v.purchasePrice, v.totalExpenses || 0, v.status, v.branch || "Coimbatore"]);
+        rows = getFilteredPurchases().map((v) => [v.name, v.regNo, v.purchasePrice, v.totalExpenses || 0, v.status, v.branch || "Tiruppur"]);
         break;
       case "balance_pending":
         headers = ["Customer", "Vehicle", "Pending Amount", "Due Date", "Branch"];
-        rows = getFilteredBalancePending().map((d) => [d.customerName, d.vehicleName, d.balanceAmount, d.date, d.branch || "Coimbatore"]);
+        rows = getFilteredBalancePending().map((d) => [d.customerName, d.vehicleName, d.balanceAmount, d.date, d.branch || "Tiruppur"]);
         break;
       case "rc_pending":
         headers = ["Customer", "Vehicle", "Registration No", "RC Status", "Branch"];
         rows = getFilteredRCPending().map((v) => {
           const matchedDeal = deals.find((d) => d.vehicleId === v.id && d.type === "Sell");
-          return [matchedDeal?.customerName || "In Yard Stock", v.name, v.regNo, v.rcType || "Paper Pending", v.branch || "Coimbatore"];
+          return [matchedDeal?.customerName || "In Yard Stock", v.name, v.regNo, v.rcType || "Paper Pending", v.branch || "Tiruppur"];
         });
         break;
       case "insurance_pending":
         headers = ["Customer", "Vehicle", "Insurance Expiry", "Days Remaining", "Branch"];
         rows = getFilteredInsurancePending().map((v) => {
           const matchedDeal = deals.find((d) => d.vehicleId === v.id && d.type === "Sell");
-          return [matchedDeal?.customerName || "In Stock", v.name, "Expired/None", "0 Days", v.branch || "Coimbatore"];
+          return [matchedDeal?.customerName || "In Stock", v.name, "Expired/None", "0 Days", v.branch || "Tiruppur"];
         });
         break;
       case "low_stock":
@@ -1260,7 +1260,7 @@ export default function Reports({
         break;
       case "noc_pending":
         headers = ["Seller/Customer", "Vehicle", "Registration No", "NOC Status", "Branch"];
-        rows = getFilteredNOCPending().map((v) => [v.sellerName || "Direct Showroom", v.name, v.regNo || "N/A", "NOC PENDING", v.branch || "Coimbatore"]);
+        rows = getFilteredNOCPending().map((v) => [v.sellerName || "Direct Showroom", v.name, v.regNo || "N/A", "NOC PENDING", v.branch || "Tiruppur"]);
         break;
       case "binding_loan":
         headers = ["Loan ID", "Customer", "Vehicle", "Finance Name", "Loan Amount", "Paid Amount", "Balance Amount", "Status"];
@@ -1311,7 +1311,7 @@ export default function Reports({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `AUTO360_ERP_Report_${activeReport}_${dateRange.from}_to_${dateRange.to}.csv`);
+    link.setAttribute("download", `AUTO_360_ERP_Report_${activeReport}_${dateRange.from}_to_${dateRange.to}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1322,7 +1322,7 @@ export default function Reports({
       const doc = new jsPDF();
       doc.setFont("helvetica");
 
-      const compName = businessProfile?.companyName || "AUTO360 AUTO CONSULTANCY";
+      const compName = businessProfile?.companyName || "AUTO 360 CONSULTANCY";
       doc.setFontSize(15);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
@@ -1423,7 +1423,7 @@ export default function Reports({
           break;
         case "sales":
           headers = ["Invoice No", "Date", "Customer Name", "Vehicle", "Amount", "Branch"];
-          rows = getFilteredDeals().map((d) => [`INV-${(d.id || "").toString().substring(0, 6).toUpperCase()}`, d.date, d.customerName, d.vehicleName, `INR ${(Number(d.totalPrice) || 0).toLocaleString("en-IN")}`, d.branch || "Coimbatore"]);
+          rows = getFilteredDeals().map((d) => [`INV-${(d.id || "").toString().substring(0, 6).toUpperCase()}`, d.date, d.customerName, d.vehicleName, `INR ${(Number(d.totalPrice) || 0).toLocaleString("en-IN")}`, d.branch || "Tiruppur"]);
           break;
         case "purchase":
           headers = ["Purchase ID", "Date", "Supplier", "Vehicle", "Amount", "Branch"];
@@ -1442,7 +1442,7 @@ export default function Reports({
           break;
         case "inventory":
           headers = ["Vehicle", "Reg No", "Reg / Type", "Status", "Cost", "Branch"];
-          rows = getFilteredPurchases().map((v) => [v.name, v.regNo, v.vehicleType, v.status, `INR ${(Number(v.purchasePrice) || 0).toLocaleString("en-IN")}`, v.branch || "Coimbatore"]);
+          rows = getFilteredPurchases().map((v) => [v.name, v.regNo, v.vehicleType, v.status, `INR ${(Number(v.purchasePrice) || 0).toLocaleString("en-IN")}`, v.branch || "Tiruppur"]);
           break;
         case "balance_pending":
           headers = ["Customer Name", "Vehicle Contract", "Pending Amount", "Due Date", "Branch"];
@@ -1452,14 +1452,14 @@ export default function Reports({
           headers = ["Customer", "Purchased Vehicle", "Registration No", "RC Status", "Branch"];
           rows = getFilteredRCPending().map((v) => {
             const matchedDeal = deals.find((d) => d.vehicleId === v.id && d.type === "Sell");
-            return [matchedDeal?.customerName || "In Stock", v.name, v.regNo, v.rcType || "Paper", v.branch || "Coimbatore"];
+            return [matchedDeal?.customerName || "In Stock", v.name, v.regNo, v.rcType || "Paper", v.branch || "Tiruppur"];
           });
           break;
         case "insurance_pending":
           headers = ["Customer", "Vehicle", "Insurance Expiry", "Days Remaining", "Branch"];
           rows = getFilteredInsurancePending().map((v) => {
             const matchedDeal = deals.find((d) => d.vehicleId === v.id && d.type === "Sell");
-            return [matchedDeal?.customerName || "In Yard", v.name, "Expired/None", "0 Days", v.branch || "Coimbatore"];
+            return [matchedDeal?.customerName || "In Yard", v.name, "Expired/None", "0 Days", v.branch || "Tiruppur"];
           });
           break;
         case "low_stock":
@@ -1468,7 +1468,7 @@ export default function Reports({
           break;
         case "noc_pending":
           headers = ["Customer", "Vehicle", "Registration No", "NOC Status", "Branch"];
-          rows = getFilteredNOCPending().map((v) => [v.sellerName || "Direct Showroom", v.name, v.regNo || "N/A", "NOC PENDING", v.branch || "Coimbatore"]);
+          rows = getFilteredNOCPending().map((v) => [v.sellerName || "Direct Showroom", v.name, v.regNo || "N/A", "NOC PENDING", v.branch || "Tiruppur"]);
           break;
         case "binding_loan":
           headers = ["Loan ID", "Customer name", "Vehicle details", "Lender Name", "Loan Amt", "Outstanding"];
@@ -1520,7 +1520,7 @@ export default function Reports({
         headStyles: { fillColor: [79, 70, 229], fontStyle: "bold" },
         styles: { fontSize: 8, cellPadding: 2.5 }
       });
-      doc.save(`AUTO360_${activeReport}_Report_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.pdf`);
+      doc.save(`AUTO_360_${activeReport}_Report_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.pdf`);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1925,7 +1925,7 @@ export default function Reports({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-950 flex items-center gap-2">
-            <TrendingUp size={24} className="text-brand-600" /> Auto360 ERP Business Intelligence
+            <TrendingUp size={24} className="text-brand-600" /> Auto 360 ERP Business Intelligence
           </h2>
           <p className="text-sm text-slate-500">Live dynamic workspace reporting, auditing & cross-branch ledger statements</p>
         </div>
@@ -2021,10 +2021,7 @@ export default function Reports({
                 className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="all">All Branches</option>
-                <option value="Coimbatore">Coimbatore</option>
-                <option value="Salem">Salem</option>
-                <option value="Erode">Erode</option>
-                <option value="Chennai">Chennai</option>
+                <option value="Tiruppur">Tiruppur</option>
                 {branches.length > 0 && branches.map((brName) => (
                   <option key={brName.id || brName.name} value={brName.name}>{brName.name}</option>
                 ))}
@@ -2433,7 +2430,7 @@ function CustomerReportTable({ customersList = [] }) {
                 <td className="py-4 font-mono text-xs text-slate-500">CUST-{c.id.substring(0, 6).toUpperCase()}</td>
                 <td className="py-4 font-bold text-slate-950">{c.name}</td>
                 <td className="py-4 font-mono font-bold">{c.mobile}</td>
-                <td className="py-4 text-slate-600">{c.address || "Coimbatore"}</td>
+                <td className="py-4 text-slate-600">{c.address || "Tiruppur"}</td>
                 <td className="py-4 text-right"><span className="px-2 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-bold rounded capitalize">{c.branch || "Salem"}</span></td>
               </tr>) : <tr><td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No customer ledger records available</td></tr>}
         </tbody>
@@ -2533,7 +2530,7 @@ function BalancePendingTable({ deals = [], onNavigate }) {
                 <td className="py-4 font-semibold text-slate-800">{row.vehicleName}</td>
                 <td className="py-4 text-right font-extrabold text-red-600">₹{row.balanceAmount.toLocaleString("en-IN")}</td>
                 <td className="py-4 font-mono font-medium text-slate-600">{row.date}</td>
-                <td className="py-4 text-right capitalize text-slate-500">{row.branch || "Coimbatore"}</td>
+                <td className="py-4 text-right capitalize text-slate-500">{row.branch || "Tiruppur"}</td>
               </tr>) : <tr><td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No clients have pending balances</td></tr>}
         </tbody>
       </table>
@@ -2558,7 +2555,7 @@ function RCPendingTable({ vehicles = [], onNavigate }) {
                 <td className="py-4 font-bold text-slate-900">{v.name}</td>
                 <td className="py-4 font-mono font-bold text-slate-600">{v.regNo || "N/A"}</td>
                 <td className="py-4"><span className="px-2 py-0.5 bg-yellow-50 text-yellow-800 border border-yellow-200 text-[10px] font-bold rounded uppercase">{v.rcType || "Paper Pending"}</span></td>
-                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Coimbatore"}</td>
+                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Tiruppur"}</td>
               </tr>) : <tr><td colSpan={5} className="py-8 text-center text-slate-400 text-sm">All vehicle RC documents are cleared</td></tr>}
         </tbody>
       </table>
@@ -2582,7 +2579,7 @@ function InsurancePendingTable({ vehicles = [], onNavigate }) {
                 <td className="py-4">
                   <span className="px-2 py-0.5 bg-red-50 text-red-800 border border-red-200 text-[10px] font-black rounded uppercase">PENDING / EXPIRED</span>
                 </td>
-                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Coimbatore"}</td>
+                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Tiruppur"}</td>
               </tr>) : <tr><td colSpan={4} className="py-8 text-center text-slate-400 text-sm">All selected vehicles currently possess valid active insurance policies</td></tr>}
         </tbody>
       </table>
@@ -2609,7 +2606,7 @@ function NOCPendingReportTable({ vehicles = [], onNavigate }) {
                 <td className="py-4 text-center">
                   <span className="px-2.5 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 text-[9px] font-black rounded uppercase">NOC PENDING</span>
                 </td>
-                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Coimbatore"}</td>
+                <td className="py-4 text-right text-slate-500 capitalize">{v.branch || "Tiruppur"}</td>
               </tr>) : <tr><td colSpan={5} className="py-8 text-center text-slate-400 text-sm">All selected vehicles possess fully cleared bank NOCs</td></tr>}
         </tbody>
       </table>

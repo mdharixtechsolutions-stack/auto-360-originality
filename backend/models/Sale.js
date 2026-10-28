@@ -16,7 +16,7 @@ const saleSchema = new mongoose.Schema({
   sale_date: { type: String, default: "" },
   salesperson: { type: String, default: "" },
   branch_id: { type: String, default: "BR001" },
-  branch: { type: String, default: "Coimbatore" },
+  branch: { type: String, default: "Tiruppur" },
   status: { type: String, default: "Completed" },
   notes: { type: String, default: "" },
   createdBy: { type: String, default: "system" },

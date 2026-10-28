@@ -46,7 +46,16 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import StockSearch from "./components/StockSearch";
 import axios from "axios";
-const LOGO_URL = "https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/auto360-logo.png";
+const LOGO_URL = "/logo.svg";
+
+// Auto-prefix backend when running in mobile Capacitor or standalone mode
+if (typeof window !== "undefined") {
+  const isCapacitorOrLocal = window.location.origin.includes("capacitor") || 
+    (window.location.hostname === "localhost" && window.location.port !== "3003" && window.location.port !== "3016");
+  if (isCapacitorOrLocal && axios) {
+    axios.defaults.baseURL = "https://auto360.harixtechsolutions.com";
+  }
+}
 
 // Intercept all native fetch calls to securely inject role, branch and admin headers on client-side requests
 const originalFetch = window.fetch;
@@ -60,17 +69,26 @@ try {
         requestUrl = url.url;
       }
       
+      const isCapacitorOrLocal = window.location.origin.includes("capacitor") || 
+        (window.location.hostname === "localhost" && window.location.port !== "3003" && window.location.port !== "3016");
+      if (isCapacitorOrLocal && requestUrl.startsWith("/")) {
+        requestUrl = "https://auto360.harixtechsolutions.com" + requestUrl;
+      }
+
       const isLocal = requestUrl && (
         !requestUrl.startsWith("http://") && !requestUrl.startsWith("https://") ||
         requestUrl.startsWith(window.location.origin) ||
+        requestUrl.includes("auto360.harixtechsolutions.com") ||
         requestUrl.startsWith("/")
       );
 
       if (isLocal) {
         const currentUserStr = localStorage.getItem("currentUser");
         const adminToken = localStorage.getItem("adminToken") || "";
+        const sessionToken = localStorage.getItem("sessionToken") || "";
         const customHeaders = {
-          ...(adminToken ? { "x-admin-token": adminToken } : {})
+          ...(adminToken ? { "x-admin-token": adminToken } : {}),
+          ...(sessionToken ? { "authorization": `Bearer ${sessionToken}` } : {})
         };
         if (currentUserStr) {
           try {
@@ -101,7 +119,7 @@ try {
           options.headers = customHeaders;
         }
       }
-      return originalFetch(url, options);
+      return originalFetch(requestUrl, options);
     },
     writable: true,
     configurable: true
@@ -118,7 +136,7 @@ const MOCK_USERS = [
     email: "john@auto360.com",
     mobile: "9876543210",
     role: "Super Admin",
-    branch: "Coimbatore",
+    branch: "Tiruppur",
     isActive: true,
     loginTimeFrom: "00:00",
     loginTimeTo: "23:59",
@@ -134,7 +152,7 @@ const MOCK_USERS = [
     email: "sarah@auto360.com",
     mobile: "9876543211",
     role: "Branch Admin",
-    branch: "Salem",
+    branch: "Tiruppur",
     isActive: true,
     loginTimeFrom: "00:00",
     loginTimeTo: "23:59",
@@ -150,7 +168,7 @@ const MOCK_USERS = [
     email: "mike@auto360.com",
     mobile: "9876543212",
     role: "Manager",
-    branch: "Erode",
+    branch: "Tiruppur",
     isActive: true,
     loginTimeFrom: "09:00",
     loginTimeTo: "18:00",
@@ -166,7 +184,7 @@ const MOCK_USERS = [
     email: "ravi@auto360.com",
     mobile: "9876543213",
     role: "Staff",
-    branch: "Coimbatore",
+    branch: "Tiruppur",
     isActive: true,
     loginTimeFrom: "09:00",
     loginTimeTo: "18:00",
@@ -382,27 +400,9 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   const [voucherEntries, setVoucherEntries] = useState([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const saved = localStorage.getItem("isLoggedIn");
-    const expiry = localStorage.getItem("sessionExpiry");
-    if (saved === "true" && expiry && Date.now() < Number(expiry)) {
-      localStorage.setItem("sessionExpiry", (Date.now() + 2 * 60 * 60 * 1000).toString());
-      return true;
-    }
-    return false;
-  });
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem("currentUser");
-    const expiry = localStorage.getItem("sessionExpiry");
-    if (saved && expiry && Date.now() < Number(expiry)) {
-      try {
-        return JSON.parse(saved);
-      } catch (err) {
-        return null;
-      }
-    }
-    return null;
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [loginError, setLoginError] = useState("");
 
   const [isSoftwareOwner, setIsSoftwareOwner] = useState(!!localStorage.getItem("adminToken"));
@@ -410,6 +410,62 @@ export default function App() {
   const [licenseInfo, setLicenseInfo] = useState({ status: "Active", licenseKey: "" });
   const [adminAuthCode, setAdminAuthCode] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
+
+  // Verify Session Token on App Load
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const token = localStorage.getItem("sessionToken");
+        const expiry = localStorage.getItem("sessionExpiry");
+        const savedUserStr = localStorage.getItem("currentUser");
+
+        if (!token || !savedUserStr || (expiry && Date.now() >= Number(expiry))) {
+          // No valid session stored
+          localStorage.removeItem("isLoggedIn");
+          localStorage.removeItem("currentUser");
+          localStorage.removeItem("sessionToken");
+          localStorage.removeItem("sessionExpiry");
+          setIsLoggedIn(false);
+          setCurrentUser(null);
+          setIsAuthChecking(false);
+          return;
+        }
+
+        const res = await fetch("/api/auth/verify", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.valid && data.user) {
+            setIsLoggedIn(true);
+            setCurrentUser(data.user);
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("currentUser", JSON.stringify(data.user));
+            // Extend session expiry
+            localStorage.setItem("sessionExpiry", (Date.now() + 8 * 60 * 60 * 1000).toString());
+          } else {
+            throw new Error("Invalid session verification");
+          }
+        } else {
+          throw new Error("Session verification rejected by server");
+        }
+      } catch (err) {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("currentUser");
+        localStorage.removeItem("sessionToken");
+        localStorage.removeItem("sessionExpiry");
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    verifySession();
+  }, []);
 
   useEffect(() => {
     const fetchLicense = async () => {
@@ -449,9 +505,9 @@ export default function App() {
   const handlePrintSearchResult = (type, item) => {
     const doc = new jsPDF();
     const profile = businessProfile || {};
-    const companyName = profile.companyName || "Auto360 Auto Consultancy";
+    const companyName = profile.companyName || "Auto 360 Consultancy";
     const email = profile.email || "info@auto360.com";
-    const phone = profile.mobile || "9876543210";
+    const phone = profile.phone || "+91 98765 43210";
     const address = profile.address || "Coimbatore, Tamil Nadu, India";
     const gstNo = profile.gstNumber || "33AAAAA1111A1Z1";
     const website = profile.website || "www.auto360.com";
@@ -628,8 +684,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const titleName = businessProfile?.companyName || "Auto360 ERP";
-    document.title = `${titleName} | Auto Consultancy & Billing`;
+    const titleName = businessProfile?.companyName || "Auto 360";
+    document.title = `${titleName} | Auto Consultancy`;
   }, [businessProfile]);
 
   const loadSyncData = useCallback(async () => {
@@ -677,7 +733,23 @@ export default function App() {
         console.warn("[Sync Sub-areas Failed]", err);
       }
       try {
-        const dataSuppliers = await safeFetch("/api/suppliers?limit=100");
+        const dataBrands = await safeFetch("/api/brands");
+        if (Array.isArray(dataBrands) && dataBrands.length > 0) {
+          setBrands(dataBrands);
+        }
+      } catch (err) {
+        console.warn("[Sync Brands Failed]", err);
+      }
+      try {
+        const dataVehicleNames = await safeFetch("/api/vehicle-names");
+        if (Array.isArray(dataVehicleNames) && dataVehicleNames.length > 0) {
+          setVehicleNames(dataVehicleNames);
+        }
+      } catch (err) {
+        console.warn("[Sync Vehicle Names Failed]", err);
+      }
+      try {
+        const dataSuppliers = await safeFetch("/api/suppliers?limit=10000");
         if (dataSuppliers?.data) {
           setSuppliers(dataSuppliers.data.map((item) => ({
             id: item.supplier_id,
@@ -695,7 +767,7 @@ export default function App() {
         console.warn("[Sync Suppliers Failed]", err);
       }
       try {
-        const dataCustomers = await safeFetch("/api/customers?limit=100");
+        const dataCustomers = await safeFetch("/api/customers?limit=10000");
         if (dataCustomers?.data) {
           setCustomers(dataCustomers.data.map((item) => ({
             id: item.customer_id,
@@ -780,6 +852,7 @@ export default function App() {
             tyreStatus: item.tyre_status || "Good",
             insurance: { hasInsurance: item.insurance_active === "Yes" },
             rcType: item.rc_type || "Card",
+            rc_available: item.rc_available || "Yes",
             noc: { hasNoc: item.noc_available === "Yes" },
             totalExpenses: (Number(item.fuel_expense) || 0) + (Number(item.repair_expense) || 0) + (Number(item.service_expense) || 0) + (Number(item.insurance_expense) || 0) + (Number(item.rto_expense) || 0) + (Number(item.other_expense) || 0),
             consultancyFees: Number(item.consultancy_fees) || 0,
@@ -849,7 +922,9 @@ export default function App() {
         console.warn("[Sync Payments Failed]", err);
       }
     } catch (e) {
-      console.error("[Auto360 Client Sync Error]", e);
+      console.error("[Auto 360 Client Sync Error]", e);
+    } finally {
+      setIsSyncing(false);
     }
   }, [isLoggedIn]);
 
@@ -959,20 +1034,15 @@ export default function App() {
         if (branch === "All Branches") {
           setSelectedBranch("all");
         } else {
-          // Normalize selected branch string (e.g., Coimbatore Branch -> Coimbatore)
           const cleanBranch = (branch || "").toLowerCase().replace(/branch/gi, "").trim();
-          if (cleanBranch.includes("coimbatore")) setSelectedBranch("Coimbatore");
-          else if (cleanBranch.includes("erode")) setSelectedBranch("Erode");
-          else if (cleanBranch.includes("salem")) setSelectedBranch("Salem");
+          if (cleanBranch.includes("tiruppur")) setSelectedBranch("Tiruppur");
           else setSelectedBranch(branch || "all");
         }
       } else {
         // Enforce their assigned branch in the frontend
         const cleanBranch = (user.branch || "").toLowerCase().replace(/branch/gi, "").trim();
-        if (cleanBranch.includes("coimbatore")) setSelectedBranch("Coimbatore");
-        else if (cleanBranch.includes("erode")) setSelectedBranch("Erode");
-        else if (cleanBranch.includes("salem")) setSelectedBranch("Salem");
-        else setSelectedBranch(user.branch || "Coimbatore");
+        if (cleanBranch.includes("tiruppur")) setSelectedBranch("Tiruppur");
+        else setSelectedBranch(user.branch || "Tiruppur");
       }
 
       if (user.permissions && user.permissions.length > 0) {
@@ -998,7 +1068,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setLicenseInfo(data);
-        alert("License Activated Successfully! Welcome to AUTO360 ERP.");
+        alert("License Activated Successfully! Welcome to Auto 360 ERP.");
       } else {
         const err = await res.json();
         alert(err.error || "Invalid License Key. Please try again.");
@@ -1119,11 +1189,14 @@ export default function App() {
     
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("currentUser");
+    localStorage.removeItem("sessionToken");
     localStorage.removeItem("sessionExpiry");
     localStorage.removeItem("currentLoginReportId");
+    sessionStorage.clear();
     setIsLoggedIn(false);
     setCurrentUser(null);
     setActiveView("dashboard");
+    navigate("/", { replace: true });
   };
 
   // Auto session duration timer verification
@@ -1135,10 +1208,9 @@ export default function App() {
         const timeLeft = Number(expiry) - Date.now();
         if (timeLeft <= 0) {
           handleLogout(true);
-        } else if (timeLeft < 15 * 60 * 1000) {
-          // extend session auto due to active focus
-          localStorage.setItem("sessionExpiry", (Date.now() + 2 * 60 * 60 * 1000).toString());
         }
+      } else {
+        handleLogout(true);
       }
     }, 15 * 1000); // 15 seconds
     return () => clearInterval(interval);
@@ -1448,7 +1520,7 @@ export default function App() {
           <div className="space-y-2">
             <h1 className="text-xl font-extrabold text-slate-900 tracking-tight font-sans">ERP License Suspended</h1>
             <p className="text-xs text-slate-500 leading-relaxed font-sans">
-              This installation of <strong className="text-slate-800">AUTO360 ERP</strong> has been locked or deactivated. Please contact your system administrator at <strong className="text-slate-800">Harix Tech Solutions</strong> to receive a valid activation token.
+              This installation of <strong className="text-slate-800">Auto 360 ERP</strong> has been locked or deactivated. Please contact your system administrator at <strong className="text-slate-800">Harix Tech Solutions</strong> to receive a valid activation token.
             </p>
           </div>
 
@@ -1482,6 +1554,15 @@ export default function App() {
 
         {/* Global Secret Admin Auth Modal */}
         {showSecretAdminAuthModal && renderSecretAdminAuthModal()}
+      </div>
+    );
+  }
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#02040a] flex flex-col items-center justify-center space-y-3 font-sans select-none">
+        <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-bold text-slate-400 font-mono tracking-wider">Verifying Session Security...</p>
       </div>
     );
   }
@@ -1533,11 +1614,13 @@ export default function App() {
           customers={branchFilteredCustomers}
           suppliers={suppliers}
           onUpdateDeals={setDeals}
+          onUpdateCustomers={setCustomers}
           onNavigate={handleNavigate}
           selectedBranch={selectedBranch}
           currentUser={currentUser}
           businessProfile={businessProfile}
           initialSearch={navigationState.search}
+          initialCustomer={navigationState.initialCustomer}
           onRefreshData={loadSyncData}
           payments={payments}
           vouchers={voucherEntries}
@@ -1558,6 +1641,7 @@ export default function App() {
             setVehicles((prev) => prev.map((v) => v.id === updatedVehicle.id ? updatedVehicle : v));
           }}
           initialPurchase={navigationState.loanPurchase}
+          initialSearch={navigationState.search}
           onNavigate={handleNavigate}
           currentUser={currentUser}
           businessProfile={businessProfile}
@@ -1575,9 +1659,11 @@ export default function App() {
           onUpdateCustomers={setCustomers}
           onNavigate={handleNavigate}
           initialVehicle={navigationState.salesVehicle}
+          initialCustomer={navigationState.initialCustomer}
           currentUser={currentUser}
           businessProfile={businessProfile}
           initialSearch={navigationState.search}
+          brands={brands}
           onRefreshData={loadSyncData}
         />;
       case "payments":
@@ -1664,6 +1750,7 @@ export default function App() {
           onUpdateCustomers={setCustomers}
           initialTab={navigationState.mastersTab}
           initialSubTab={navigationState.mastersSubTab}
+          initialSearch={navigationState.search}
           currentUser={currentUser}
           isSoftwareOwner={isSoftwareOwner}
         />;
@@ -1737,7 +1824,7 @@ export default function App() {
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-sm font-black tracking-tight text-slate-900 leading-tight uppercase line-clamp-2">
-                  {businessProfile.companyName || "AUTO360"}
+                  {businessProfile.companyName || "AUTO 360"}
                 </span>
                 <span className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mt-0.5">
                   {businessProfile.companyName ? "Enterprise" : "Consultancy"}
@@ -1954,10 +2041,10 @@ export default function App() {
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-xs font-black text-slate-950 leading-none uppercase tracking-tight line-clamp-1">
-                  {businessProfile.companyName || "AUTO360"}
+                  {businessProfile.companyName || "Auto 360"}
                 </span>
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 leading-none">
-                  {currentUser?.role === "Super Admin" ? (selectedBranch === "all" ? "All Branches" : `${selectedBranch} Branch`) : `${currentUser?.branch || "Coimbatore"} Branch`}
+                  {`${currentUser?.branch || "Tiruppur"} Branch`}
                 </span>
               </div>
             </div>
@@ -1999,33 +2086,91 @@ export default function App() {
             <div className="flex items-center gap-2">
               <div className="text-right sm:block">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1 text-left sm:text-right">Active Branch</p>
-                {currentUser?.role === "Super Admin" ? <select
-    value={selectedBranch}
-    onChange={(e) => setSelectedBranch(e.target.value)}
-    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-850 outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer transition-all"
-  >
-                    <option value="all">All Branches</option>
-                    <option value="Coimbatore">Coimbatore</option>
-                    <option value="Erode">Erode</option>
-                    <option value="Salem">Salem</option>
-                    {
-    /* Fallback support for any dynamically created branches */
-  }
-                    {branches.filter((b) => b.name !== "Coimbatore" && b.name !== "Erode" && b.name !== "Salem").map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
-                  </select> : <p className="text-xs font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{currentUser?.branch || "Coimbatore"}</p>}
+                <p className="text-xs font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{currentUser?.branch || "Tiruppur"}</p>
               </div>
             </div>
           </div>
         </header>
 
-        {
-    /* Content Area */
-  }
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8">
           <div className="w-full">
             {renderView()}
           </div>
         </main>
+
+        {/* Native Mobile Bottom Navigation Bar (Auto 360 Mobile App) */}
+        <nav className="lg:hidden shrink-0 bg-[#091122]/95 backdrop-blur-xl border-t border-slate-800/80 px-2 py-2 flex items-center justify-around z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.5)]">
+          <button
+            onClick={() => handleNavigate("dashboard")}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-all rounded-xl ${
+              activeView === "dashboard"
+                ? "text-cyan-400 font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${activeView === "dashboard" ? "bg-cyan-500/20 text-cyan-400" : ""}`}>
+              <LayoutDashboard size={20} />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight font-medium">Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => handleNavigate("stock_search")}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-all rounded-xl ${
+              activeView === "stock_search"
+                ? "text-cyan-400 font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${activeView === "stock_search" ? "bg-cyan-500/20 text-cyan-400" : ""}`}>
+              <Car size={20} />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight font-medium">Vehicles</span>
+          </button>
+
+          <button
+            onClick={() => handleNavigate("purchase")}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-all rounded-xl ${
+              activeView === "purchase"
+                ? "text-cyan-400 font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${activeView === "purchase" ? "bg-cyan-500/20 text-cyan-400" : ""}`}>
+              <FileText size={20} />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight font-medium">Purchase</span>
+          </button>
+
+          <button
+            onClick={() => handleNavigate("sales")}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-all rounded-xl ${
+              activeView === "sales"
+                ? "text-cyan-400 font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${activeView === "sales" ? "bg-cyan-500/20 text-cyan-400" : ""}`}>
+              <Handshake size={20} />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight font-medium">Sales</span>
+          </button>
+
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-all rounded-xl ${
+              isSidebarOpen
+                ? "text-cyan-400 font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className={`p-1 rounded-lg ${isSidebarOpen ? "bg-cyan-500/20 text-cyan-400" : ""}`}>
+              <Menu size={20} />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight font-medium">Menu</span>
+          </button>
+        </nav>
 
         {/* GLOBAL SEARCH RESULTS BACKDROP DIALOG (AUTO360 ERP STYLE) */}
         <AnimatePresence>

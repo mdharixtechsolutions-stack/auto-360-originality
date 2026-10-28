@@ -38,7 +38,7 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
       date: formData.date,
       vehicleId: formData.vehicleId || "",
       staff: currentUser?.name || "Admin",
-      branch: currentUser?.branch || "Coimbatore"
+      branch: currentUser?.branch || "Tiruppur"
     };
     try {
       const res = await fetch("/api/expenses", {

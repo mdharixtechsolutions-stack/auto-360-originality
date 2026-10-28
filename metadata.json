@@ -1,6 +1,6 @@
 {
-  "name": "Auto360 Consultancy Admin",
-  "description": "A comprehensive admin panel for auto consultancy management, featuring staff, customer, vehicle, deal, and payment tracking with RBAC and reporting.",
+  "name": "Auto 360 ERP",
+  "description": "A comprehensive admin panel for Auto 360 consultancy management, featuring staff, customer, vehicle, deal, and payment tracking with RBAC and reporting.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
