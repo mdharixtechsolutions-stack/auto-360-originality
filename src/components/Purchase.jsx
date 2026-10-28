@@ -146,10 +146,34 @@ export default function PurchasesListAndForm({
       }));
     }
   }, [initialCustomer]);
-  const [localFrom, setLocalFrom] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
-  const [localTo, setLocalTo] = useState(() => localStorage.getItem("financialYearTo") || "2026-03-31");
-  const [fromDate, setFromDate] = useState(() => localStorage.getItem("financialYearFrom") || "2025-04-01");
-  const [toDate, setToDate] = useState(() => localStorage.getItem("financialYearTo") || "2026-03-31");
+  const [localFrom, setLocalFrom] = useState(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const startYear = now.getMonth() >= 3 ? curYear : curYear - 1;
+    const stored = localStorage.getItem("financialYearFrom");
+    return (stored && stored !== "2025-04-01") ? stored : `${startYear}-04-01`;
+  });
+  const [localTo, setLocalTo] = useState(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const startYear = now.getMonth() >= 3 ? curYear : curYear - 1;
+    const stored = localStorage.getItem("financialYearTo");
+    return (stored && stored !== "2026-03-31") ? stored : `${startYear + 1}-03-31`;
+  });
+  const [fromDate, setFromDate] = useState(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const startYear = now.getMonth() >= 3 ? curYear : curYear - 1;
+    const stored = localStorage.getItem("financialYearFrom");
+    return (stored && stored !== "2025-04-01") ? stored : `${startYear}-04-01`;
+  });
+  const [toDate, setToDate] = useState(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const startYear = now.getMonth() >= 3 ? curYear : curYear - 1;
+    const stored = localStorage.getItem("financialYearTo");
+    return (stored && stored !== "2026-03-31") ? stored : `${startYear + 1}-03-31`;
+  });
   const [selectedPreset, setSelectedPreset] = useState("thisFY");
 
   const getPresetDates = (presetId) => {
@@ -191,8 +215,11 @@ export default function PurchasesListAndForm({
         };
       }
       case "thisFY": {
-        const fyFrom = localStorage.getItem("financialYearFrom") || "2025-04-01";
-        const fyTo = localStorage.getItem("financialYearTo") || "2026-03-31";
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const startYear = now.getMonth() >= 3 ? curYear : curYear - 1;
+        const fyFrom = localStorage.getItem("financialYearFrom") || `${startYear}-04-01`;
+        const fyTo = localStorage.getItem("financialYearTo") || `${startYear + 1}-03-31`;
         return { from: fyFrom, to: fyTo };
       }
       case "allTime": {
@@ -1403,38 +1430,44 @@ export default function PurchasesListAndForm({
     /* Dynamic type filters */
   }
         <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full md:w-auto overflow-x-auto no-scrollbar">
-          {["all", "Customer", "Supplier"].map((type) => <button
-    key={type}
-    onClick={() => {
-      setTypeFilter(type);
-      setPage(1);
-    }}
-    className={cn(
-      "px-5 py-2 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
-      typeFilter === type ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
-    )}
-  >
+          {["all", "Customer", "Supplier"].map((type) => (
+            <button
+              key={type}
+              type="button"
+              aria-pressed={typeFilter === type ? "true" : "false"}
+              onClick={() => {
+                setTypeFilter(type);
+                setPage(1);
+              }}
+              className={cn(
+                "px-5 py-2 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
+                typeFilter === type ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
+              )}
+            >
               {type === "all" ? "All Roles" : `${type} Sourced`}
-            </button>)}
+            </button>
+          ))}
         </div>
 
-        {
-    /* Dynamic status filters */
-  }
+        {/* Dynamic status filters */}
         <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full md:w-auto overflow-x-auto no-scrollbar">
-          {["all", "Available", "Booked", "Service Process", "Sold"].map((status) => <button
-    key={status}
-    onClick={() => {
-      setStatusFilter(status);
-      setPage(1);
-    }}
-    className={cn(
-      "px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
-      statusFilter === status ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
-    )}
-  >
+          {["all", "Available", "Booked", "Service Process", "Sold"].map((status) => (
+            <button
+              key={status}
+              type="button"
+              aria-pressed={statusFilter === status ? "true" : "false"}
+              onClick={() => {
+                setStatusFilter(status);
+                setPage(1);
+              }}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
+                statusFilter === status ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
+              )}
+            >
               {status}
-            </button>)}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1515,13 +1548,13 @@ export default function PurchasesListAndForm({
           <button
             type="button"
             onClick={() => {
-              const fyFrom = localStorage.getItem("financialYearFrom") || "2025-04-01";
-              const fyTo = localStorage.getItem("financialYearTo") || "2026-03-31";
-              setLocalFrom(fyFrom);
-              setLocalTo(fyTo);
-              setFromDate(fyFrom);
-              setToDate(fyTo);
-              setSelectedPreset("thisFY");
+              setTypeFilter("all");
+              setStatusFilter("all");
+              setLocalFrom("");
+              setLocalTo("");
+              setFromDate("");
+              setToDate("");
+              setSelectedPreset("allTime");
               setSearchQuery("");
               setPage(1);
             }}

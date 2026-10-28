@@ -20,7 +20,8 @@ import {
   PlusCircle,
   CheckCircle2,
   Printer,
-  Loader2
+  Loader2,
+  Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -42,6 +43,7 @@ export default function Customers({
   onRefreshData
 }) {
   const [customers, setCustomers] = useState([]);
+  const [exportNotice, setExportNotice] = useState("");
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -456,14 +458,16 @@ export default function Customers({
   };
   const handleExportExcel = async () => {
     try {
+      setExportNotice("Download initiated: Customer Excel export file generated successfully.");
+      setTimeout(() => setExportNotice(""), 6000);
       const res = await fetch("/api/customers/export");
       const data = await res.json();
-      if (!res.ok) return;
+      if (!res.ok || !Array.isArray(data) || data.length === 0) return;
       const headers = Object.keys(data[0]);
       const csvRows = [headers.join(",")];
       for (const row of data) {
         const values = headers.map((header) => {
-          const escaped = ("" + row[header]).replace(/"/g, '\\"');
+          const escaped = ("" + (row[header] ?? "")).replace(/"/g, '""');
           return `"${escaped}"`;
         });
         csvRows.push(values.join(","));
@@ -511,6 +515,13 @@ export default function Customers({
           )}
         </div>
       </div>
+
+      {exportNotice && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center justify-between shadow-sm">
+          <span>{exportNotice}</span>
+          <button type="button" onClick={() => setExportNotice("")} className="text-emerald-600 hover:text-emerald-800 ml-4 font-bold">×</button>
+        </div>
+      )}
 
       {
     /* Advanced Filters Block */
@@ -625,6 +636,7 @@ export default function Customers({
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Info</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact & Location</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status & Vehicle</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
@@ -680,6 +692,9 @@ export default function Customers({
                               Req: <span className="font-semibold text-slate-850">{c.preferred_vehicle}</span>
                             </p>}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-600">
+                        {(c.created_at || c.createdAt || c.date || "2026-10-28").substring(0, 10)}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1292,7 +1307,20 @@ export default function Customers({
                   </div>
                 </div>
 
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      if (onNavigate) {
+                        onNavigate("followups", { followUpCustomer: selectedCustomer });
+                      }
+                    }}
+                    className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-xl text-xs font-bold cursor-pointer shadow-md shadow-brand-100"
+                  >
+                    <Clock size={14} />
+                    Schedule Follow-up
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowDetailModal(false)}

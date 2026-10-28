@@ -3,54 +3,101 @@ import { Plus, Calendar, User, Clock, CheckCircle2, AlertCircle, Phone, MessageS
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { hasModulePermission } from "../lib/permissions";
-const mockFollowUps = [
-  {
-    id: "F-1",
-    customer: "Amit Kumar",
-    notes: "Interested in Tata Nexon, requested test drive",
-    nextDate: "2024-04-05",
-    staff: "Sarah Sales",
-    status: "Pending"
-  },
-  {
-    id: "F-2",
-    customer: "Suresh Raina",
-    notes: "Negotiating price for BMW X5",
-    nextDate: "2024-04-03",
-    staff: "John Admin",
-    status: "Today"
-  }
-];
-export default function FollowUps({ customers = [], currentUser }) {
-  const [followUps, setFollowUps] = useState(mockFollowUps);
-  const [showAddModal, setShowAddModal] = useState(false);
+const getInitialMockFollowUps = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+  const nextWeekStr = nextWeek.toISOString().split("T")[0];
+
+  return [
+    {
+      id: "F-1",
+      customer: "Amit Kumar",
+      notes: "Interested in Tata Nexon, requested test drive",
+      nextDate: nextWeekStr,
+      staff: "Sarah Sales",
+      status: "Pending"
+    },
+    {
+      id: "F-2",
+      customer: "Suresh Raina",
+      notes: "Negotiating price for BMW X5",
+      nextDate: todayStr,
+      staff: "John Admin",
+      status: "Today"
+    }
+  ];
+};
+
+export default function FollowUps({ customers = [], currentUser, initialFollowUpCustomer }) {
+  const [followUps, setFollowUps] = useState(getInitialMockFollowUps);
+  const [showAddModal, setShowAddModal] = useState(Boolean(initialFollowUpCustomer));
+
+  const todayStr = useMemo(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
   const [formData, setFormData] = useState({
-    customerId: "",
-    customerName: "",
+    customerId: initialFollowUpCustomer?.id || "",
+    customerName: initialFollowUpCustomer?.name || initialFollowUpCustomer?.customer_name || "",
     nextDate: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    staff: "John Admin",
+    staff: currentUser?.name || "John Admin",
     notes: ""
   });
-  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState(initialFollowUpCustomer?.name || "");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const filteredCustomers = useMemo(() => (customers || []).filter(
-    (c) => !c.isDeleted && (((c.name || c.customer_name || "").toLowerCase().includes((customerSearch || "").toLowerCase())) || ((c.mobile || c.customer_mobile || "").includes(customerSearch || "")))
-  ), [customers, customerSearch]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = (customerSearch || "").toLowerCase();
+    const list = (customers || []).filter((c) => !c.isDeleted);
+    if (!q) return list;
+    return list.filter(
+      (c) =>
+        (c.name || c.customer_name || "").toLowerCase().includes(q) ||
+        (c.mobile || c.customer_mobile || "").includes(q)
+    );
+  }, [customers, customerSearch]);
+
   const filteredFollowUps = useMemo(
     () => followUps.filter((f) => {
-      const matchesSearch = f.customer.toLowerCase().includes(searchQuery.toLowerCase()) || f.notes.toLowerCase().includes(searchQuery.toLowerCase()) || f.staff.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTab = activeTab === "all" || activeTab === "today" && f.status === "Today" || activeTab === "upcoming" && f.status === "Pending" || activeTab === "completed" && f.status === "Completed";
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q || (f.customer || "").toLowerCase().includes(q) || (f.notes || "").toLowerCase().includes(q) || (f.staff || "").toLowerCase().includes(q);
+
+      const isToday = f.status === "Today" || f.nextDate === todayStr;
+      // Strict upcoming: next date must be in the future, and status not completed
+      const isUpcoming = (f.status === "Pending" || f.status === "Upcoming") && f.nextDate > todayStr;
+      const isCompleted = f.status === "Completed";
+
+      let matchesTab = true;
+      if (activeTab === "today") {
+        matchesTab = isToday;
+      } else if (activeTab === "upcoming") {
+        matchesTab = isUpcoming;
+      } else if (activeTab === "completed") {
+        matchesTab = isCompleted;
+      }
+
       return matchesSearch && matchesTab;
     }),
-    [followUps, searchQuery, activeTab]
+    [followUps, searchQuery, activeTab, todayStr]
   );
+
   const stats = useMemo(() => ({
-    today: followUps.filter((f) => f.status === "Today").length,
-    upcoming: followUps.filter((f) => f.status === "Pending").length,
+    today: followUps.filter((f) => f.status === "Today" || f.nextDate === todayStr).length,
+    upcoming: followUps.filter((f) => (f.status === "Pending" || f.status === "Upcoming") && f.nextDate > todayStr).length,
     completed: followUps.filter((f) => f.status === "Completed").length
-  }), [followUps]);
+  }), [followUps, todayStr]);
   const handleSchedule = () => {
     if (!formData.customerName || !formData.notes) return;
     const newFollowUp = {
@@ -236,20 +283,38 @@ export default function FollowUps({ customers = [], currentUser }) {
     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
     placeholder="Search customer..."
   />
-                    {showCustomerDropdown && customerSearch && <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
-                        {filteredCustomers.length > 0 ? filteredCustomers.map((c) => <button
-    key={c.id}
-    onClick={() => {
-      setFormData((prev) => ({ ...prev, customerId: c.id, customerName: c.name }));
-      setCustomerSearch(c.name);
-      setShowCustomerDropdown(false);
-    }}
-    className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm border-b border-slate-100 last:border-0"
-  >
-                              <p className="font-bold text-slate-900">{c.name}</p>
-                              <p className="text-xs text-slate-500">{c.mobile}</p>
-                            </button>) : <div className="px-4 py-2 text-xs text-slate-500">No customers found</div>}
-                      </div>}
+                    {showCustomerDropdown && customerSearch && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                        {filteredCustomers.length > 0 ? (
+                          filteredCustomers.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, customerId: c.id, customerName: c.name || c.customer_name }));
+                                setCustomerSearch(c.name || c.customer_name);
+                                setShowCustomerDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm border-b border-slate-100 last:border-0"
+                            >
+                              <p className="font-bold text-slate-900">{c.name || c.customer_name}</p>
+                              <p className="text-xs text-slate-500">{c.mobile || c.customer_mobile || "Customer"}</p>
+                            </button>
+                          ))
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({ ...prev, customerId: "CUST-DIRECT", customerName: customerSearch }));
+                              setShowCustomerDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-brand-50 text-xs font-bold text-brand-700"
+                          >
+                            Select "{customerSearch}" as customer
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">

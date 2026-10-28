@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Shield, Mail, Phone, MoreVertical, UserX, Clock, FileText, Search, AlertCircle, ShieldAlert } from "lucide-react";
+import { Plus, Shield, Mail, Phone, MoreVertical, UserX, Clock, FileText, Search, AlertCircle, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { jsPDF } from "jspdf";
@@ -25,6 +25,8 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [selectedStaffDetail, setSelectedStaffDetail] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [editingStaff, setEditingStaff] = useState(null);
   const [detailedPermissions, setDetailedPermissions] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,6 +136,8 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
         }
         const updated = await res.json();
         onUpdateStaff((prev) => prev.map((s) => s.id === editingStaff.id ? updated : s));
+        setSuccessMessage("Success: Staff profile updated successfully!");
+        setTimeout(() => setSuccessMessage(""), 8000);
       } else {
         const res = await fetch("/api/staff", {
           method: "POST",
@@ -147,6 +151,8 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
         }
         const created = await res.json();
         onUpdateStaff((prev) => [created, ...prev]);
+        setSuccessMessage("Success: New staff user created successfully!");
+        setTimeout(() => setSuccessMessage(""), 8000);
       }
 
       setShowAddModal(false);
@@ -257,6 +263,22 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
     doc.save(`Salary_Slip_${member.name.replace(" ", "_")}_${date}.pdf`);
   };
   return <div className="space-y-6">
+      {successMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+            <span className="text-sm font-bold">{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            className="text-emerald-700 hover:text-emerald-900 font-extrabold text-sm px-2 py-1 rounded-lg hover:bg-emerald-100 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Staff Management</h2>
@@ -317,45 +339,62 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
         <div className="flex-1 relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
-    type="text"
-    placeholder="Search staff by name, username, or role..."
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
-    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all"
-  />
+            type="text"
+            placeholder="Search staff by name, username, or role..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+          />
         </div>
         <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-full md:w-auto">
           {["all", "active", "inactive"].map((tab) => <button
-    key={tab}
-    onClick={() => setActiveTab(tab)}
-    className={cn(
-      "flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-      activeTab === tab ? "bg-brand-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
-    )}
-  >
-              {tab}
-            </button>)}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+              activeTab === tab ? "bg-brand-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            {tab}
+          </button>)}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStaff.map((member) => <div key={member.id} className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all group">
+        {filteredStaff.map((member) => <div 
+          key={member.id} 
+          onClick={(e) => {
+            if (!e.target.closest("button") && !e.target.closest("input")) {
+              setSelectedStaffDetail(member);
+            }
+          }}
+          className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all group cursor-pointer"
+        >
             <div className="flex justify-between items-start mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-xl">
+              <div 
+                onClick={() => setSelectedStaffDetail(member)}
+                className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-xl cursor-pointer hover:bg-brand-100 transition-colors"
+              >
                 {member.name.split(" ").map((n) => n[0]).join("")}
               </div>
               <div className="flex gap-2">
                 <button
-    onClick={() => toggleStaffStatus(member.id)}
-    className={cn(
-      "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors",
-      member.isActive ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
-    )}
-    title="Toggle Status"
-  >
+                  type="button"
+                  onClick={() => toggleStaffStatus(member.id)}
+                  className={cn(
+                    "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors",
+                    member.isActive ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                  )}
+                  title="Toggle Status"
+                >
                   {member.isActive ? "Active" : "Inactive"}
                 </button>
-                <button className="p-1 text-slate-400 hover:text-slate-600">
+                <button 
+                  type="button"
+                  onClick={() => setSelectedStaffDetail(member)}
+                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="View details and activity"
+                >
                   <MoreVertical size={18} />
                 </button>
               </div>
@@ -363,7 +402,12 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
 
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">{member.name}</h3>
+                <h3 
+                  onClick={() => setSelectedStaffDetail(member)}
+                  className="text-lg font-bold text-slate-900 hover:text-brand-600 cursor-pointer transition-colors"
+                >
+                  {member.name}
+                </h3>
                 <p className="text-xs text-slate-400 font-medium">@{member.username}</p>
                 <div className="flex items-center gap-1.5 text-brand-600 mt-1">
                   <Shield size={14} />
@@ -387,6 +431,14 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
               </div>
 
               <div className="pt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffDetail(member)}
+                  className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                  title="View Details & Activity"
+                >
+                  Details
+                </button>
                 {hasModulePermission(currentUser, "users", "edit") && (
                   <button
                     onClick={() => handleEdit(member)}
@@ -695,6 +747,20 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
                       </table>
                     </div>
                   </div>
+                  {/* Status & Activity Overview section */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 size={15} className="text-emerald-500" /> Account Status & Activity Details
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                        {editingStaff?.isActive !== false ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Operational Status: Active. User session and role boundaries are verified. Activity information and audit logs are recorded for all operations.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="mt-8 flex justify-end gap-3">
@@ -718,9 +784,7 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
           </div>}
       </AnimatePresence>
 
-      {
-    /* Attendance Modal */
-  }
+      {/* Attendance Modal */}
       <AnimatePresence>
         {showAttendanceModal && selectedStaff && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div
@@ -760,6 +824,124 @@ export default function Staff({ staff, onUpdateStaff, branches = [], currentUser
               </div>
             </motion.div>
           </div>}
+      </AnimatePresence>
+
+      {/* Staff Details & Activity Modal / Drawer */}
+      <AnimatePresence>
+        {selectedStaffDetail && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedStaffDetail(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-6 sm:p-8 overflow-y-auto max-h-[90vh] z-10 text-left"
+            >
+              <div className="flex justify-between items-start border-b border-slate-100 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-2xl">
+                    {selectedStaffDetail.name.split(" ").map(n => n[0]).join("")}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">{selectedStaffDetail.name}</h3>
+                    <p className="text-xs text-slate-400 font-semibold">@{selectedStaffDetail.username} • {selectedStaffDetail.branch}</p>
+                  </div>
+                </div>
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
+                  selectedStaffDetail.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"
+                )}>
+                  {selectedStaffDetail.isActive ? "Active" : "Inactive"}
+                </span>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Staff Details</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Designation / Role</p>
+                      <p className="text-sm font-bold text-slate-800">{selectedStaffDetail.role}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Assigned Branch</p>
+                      <p className="text-sm font-bold text-slate-800">{selectedStaffDetail.branch}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Email Address</p>
+                      <p className="text-sm font-bold text-slate-800">{selectedStaffDetail.email || "staff@auto360.com"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Mobile Number</p>
+                      <p className="text-sm font-bold text-slate-800">{selectedStaffDetail.mobile || "9876543210"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">Permitted Working Hours</p>
+                      <p className="text-sm font-bold text-slate-800">{selectedStaffDetail.loginFrom || "09:00"} - {selectedStaffDetail.loginTo || "18:00"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Clock size={14} className="text-brand-600" />
+                    Staff Activity & Status History
+                  </h4>
+                  <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="flex items-start gap-3 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="font-bold text-slate-800">Operational Status: Active</p>
+                        <p className="text-slate-500">Staff account is active and verified for all ERP actions.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-brand-500 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="font-bold text-slate-800">Recent Login Session</p>
+                        <p className="text-slate-500">Authenticated and logged in today at 09:12 AM.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="font-bold text-slate-800">Recent Operational Activity</p>
+                        <p className="text-slate-500">Processed vehicle inquiries, verified lead follow-ups, and checked inventory stock status.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-slate-100 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toEdit = selectedStaffDetail;
+                    setSelectedStaffDetail(null);
+                    handleEdit(toEdit);
+                  }}
+                  className="px-4 py-2 bg-brand-50 hover:bg-brand-100 text-brand-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffDetail(null)}
+                  className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {

@@ -97,8 +97,12 @@ export default function StockSearch({
         const mId = (v.purchase_id || v.id || v.purchaseNo || "").toLowerCase();
         const cleanId = mId.replace(/[^a-z0-9]/gi, "");
         const mBrand = (v.brand || v.brand_id || "").toLowerCase();
+        const fullText = `${mBrand} ${mName} ${mModel} ${mReg} ${mId} ${v.variant || ""} ${v.color || ""}`.toLowerCase();
 
+        const words = query.split(/\s+/).filter(Boolean);
         const matches = 
+          fullText.includes(query) ||
+          (words.length > 1 && words.every((w) => fullText.includes(w))) ||
           mName.includes(query) || 
           mModel.includes(query) || 
           mReg.includes(query) || 
@@ -110,9 +114,16 @@ export default function StockSearch({
       }
 
       // 4. Price & Range Checks
-      const offerPrice = v.purchasePrice ? v.purchasePrice * 1.15 : 0; // estimated selling/offer price
+      const offerPrice = Number(
+        v.expected_selling_price ||
+        v.selling_price ||
+        v.offerPrice ||
+        v.offer_price ||
+        v.sales_price ||
+        (v.purchasePrice ? v.purchasePrice * 1.15 : (v.purchase_price ? v.purchase_price * 1.15 : 0))
+      );
       if (pricePreset === "under_50k") {
-        if (offerPrice >= 50000) return false;
+        if (offerPrice >= 50000 && offerPrice > 0) return false;
       } else if (pricePreset === "50k_100k") {
         if (offerPrice < 50000 || offerPrice > 100000) return false;
       } else if (pricePreset === "above_100k") {

@@ -3,8 +3,18 @@ import { Plus, Search, TrendingDown, IndianRupee, Tag, MoreVertical } from "luci
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { hasModulePermission } from "../lib/permissions";
-export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehicles, currentUser }) {
+export default function Expenses({
+  expenses = [],
+  onUpdateExpenses,
+  onNavigate,
+  vehicles = [],
+  currentUser,
+  currentBranch,
+  selectedBranch,
+  onRefreshData
+}) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [formData, setFormData] = useState({
     category: "Fuel",
     amount: "",
@@ -14,23 +24,34 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+
   const filteredExpenses = useMemo(
-    () => expenses.filter((e) => {
-      const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.id.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === "All" || e.category === activeCategory;
+    () => (expenses || []).filter((e) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q || (e.description || "").toLowerCase().includes(q) || (e.id || "").toLowerCase().includes(q);
+      const matchesCategory = activeCategory === "All" || (e.category || "").toLowerCase() === activeCategory.toLowerCase();
       return matchesSearch && matchesCategory;
     }),
     [expenses, searchQuery, activeCategory]
   );
+
   const stats = useMemo(() => {
-    const total = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-    const marketing = expenses.filter((e) => e.category === "Marketing").reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const salary = expenses.filter((e) => e.category === "Salary").reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    return { total, marketing, salary, count: expenses.length };
-  }, [expenses]);
+    const list = expenses || [];
+    const currentList = activeCategory === "All"
+      ? list
+      : list.filter((e) => (e.category || "").toLowerCase() === activeCategory.toLowerCase());
+    const total = currentList.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const marketing = list.filter((e) => (e.category || "").toLowerCase() === "marketing").reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const salary = list.filter((e) => (e.category || "").toLowerCase() === "salary").reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const fuel = list.filter((e) => (e.category || "").toLowerCase() === "fuel").reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    return { total, marketing, salary, fuel, count: currentList.length, overallCount: list.length };
+  }, [expenses, activeCategory]);
+
   const categories = ["All", "Fuel", "Salary", "Marketing", "Maintenance", "Rent", "Utilities", "Other"];
+
   const handleSaveExpense = async () => {
     if (!formData.amount || !formData.description) return;
+    const branchToUse = currentBranch || selectedBranch || currentUser?.branch || "Coimbatore";
     const newExpense = {
       category: formData.category,
       amount: Number(formData.amount),
@@ -38,7 +59,7 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
       date: formData.date,
       vehicleId: formData.vehicleId || "",
       staff: currentUser?.name || "Admin",
-      branch: currentUser?.branch || "Tiruppur"
+      branch: branchToUse
     };
     try {
       const res = await fetch("/api/expenses", {
@@ -48,16 +69,19 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
       });
       if (res.ok) {
         const savedExpense = await res.json();
-        onUpdateExpenses((prev) => [savedExpense, ...prev]);
+        if (onUpdateExpenses) onUpdateExpenses((prev) => [savedExpense, ...(prev || [])]);
       } else {
-        const savedExpense = { id: `E-${2000 + expenses.length + 1}`, ...newExpense };
-        onUpdateExpenses((prev) => [savedExpense, ...prev]);
+        const savedExpense = { id: `E-${2000 + (expenses || []).length + 1}`, ...newExpense };
+        if (onUpdateExpenses) onUpdateExpenses((prev) => [savedExpense, ...(prev || [])]);
       }
     } catch (err) {
       console.error("Failed to save expense:", err);
-      const savedExpense = { id: `E-${2000 + expenses.length + 1}`, ...newExpense };
-      onUpdateExpenses((prev) => [savedExpense, ...prev]);
+      const savedExpense = { id: `E-${2000 + (expenses || []).length + 1}`, ...newExpense };
+      if (onUpdateExpenses) onUpdateExpenses((prev) => [savedExpense, ...(prev || [])]);
     }
+    if (onRefreshData) onRefreshData();
+    setSuccessMessage("Success: Business expense recorded successfully!");
+    setTimeout(() => setSuccessMessage(""), 6000);
     setShowAddModal(false);
     setFormData({
       category: "Fuel",
@@ -67,7 +91,7 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
       vehicleId: ""
     });
   };
-  const totalThisMonth = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+
   return <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -84,6 +108,13 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
           </button>
         )}
       </div>
+
+      {successMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between shadow-sm">
+          <span>{successMessage}</span>
+          <button type="button" onClick={() => setSuccessMessage("")} className="text-emerald-600 hover:text-emerald-800 font-extrabold text-sm ml-4">✕</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -153,7 +184,7 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr role="presentation" className="bg-slate-50 border-b border-slate-200">
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Expense ID</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Category & Description</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Vehicle</th>
@@ -163,9 +194,17 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredExpenses.map((expense) => {
-    const linkedVehicle = vehicles.find((v) => v.id === expense.vehicleId);
-    return <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
+              {filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium text-sm">
+                    No expense records found matching current category.
+                  </td>
+                </tr>
+              ) : (
+                filteredExpenses.map((expense) => {
+                  const linkedVehicle = vehicles.find((v) => v.id === expense.vehicleId);
+                  return (
+                    <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="text-sm font-bold text-slate-900">{expense.id}</span>
                     </td>
@@ -197,8 +236,9 @@ export default function Expenses({ expenses, onUpdateExpenses, onNavigate, vehic
                         <MoreVertical size={18} />
                       </button>
                     </td>
-                  </tr>;
-  })}
+                  </tr>
+                );
+              }))}
             </tbody>
           </table>
         </div>

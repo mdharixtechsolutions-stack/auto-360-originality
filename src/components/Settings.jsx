@@ -100,8 +100,22 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
 }
 function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRefreshData }) {
   const { language, setLanguage, t } = useLanguage();
+  
+  const findStateLabel = (val) => {
+    if (!val) return "Tamil Nadu (TN)";
+    const found = INDIAN_STATES.find(s => 
+      s.label.toLowerCase() === val.toLowerCase() ||
+      s.name.toLowerCase() === val.toLowerCase() ||
+      s.code.toLowerCase() === val.toLowerCase()
+    );
+    return found ? found.label : val;
+  };
+
   const [appName, setAppName] = useState(businessProfile?.companyName || "Auto 360");
-  const [defaultState, setDefaultState] = useState(businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu");
+  const [defaultState, setDefaultState] = useState(() => findStateLabel(businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu"));
+  const [currency, setCurrency] = useState("INR");
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [savedSettings, setSavedSettings] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -110,8 +124,25 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
         const res = await fetch("/api/settings/general");
         if (res.ok) {
           const data = await res.json();
-          if (data.appName) setAppName(data.appName);
-          if (data.defaultState) setDefaultState(data.defaultState);
+          const loadedAppName = data.appName || businessProfile?.companyName || "Auto 360";
+          const loadedState = findStateLabel(data.defaultState || businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu");
+          const loadedCurrency = (data.currency || "").toUpperCase().includes("USD") ? "USD" : "INR";
+          const loadedTimezone = data.timezone || "Asia/Kolkata";
+          const loadedLang = data.language || "en";
+          
+          setAppName(loadedAppName);
+          setDefaultState(loadedState);
+          setCurrency(loadedCurrency);
+          setTimezone(loadedTimezone);
+          if (data.language && setLanguage) setLanguage(data.language);
+
+          setSavedSettings({
+            appName: loadedAppName,
+            defaultState: loadedState,
+            currency: loadedCurrency,
+            timezone: loadedTimezone,
+            language: loadedLang
+          });
         }
       } catch (e) {
         console.warn("Failed to fetch general settings on mount:", e);
@@ -124,10 +155,27 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
     if (businessProfile) {
       if (businessProfile.companyName) setAppName(businessProfile.companyName);
       if (businessProfile.defaultState || businessProfile.state) {
-        setDefaultState(businessProfile.defaultState || businessProfile.state);
+        setDefaultState(findStateLabel(businessProfile.defaultState || businessProfile.state));
       }
     }
   }, [businessProfile]);
+
+  const handleReset = () => {
+    if (savedSettings) {
+      setAppName(savedSettings.appName);
+      setDefaultState(savedSettings.defaultState);
+      setCurrency(savedSettings.currency);
+      setTimezone(savedSettings.timezone);
+      if (setLanguage) setLanguage(savedSettings.language);
+    } else {
+      setAppName("Auto 360");
+      setDefaultState("Tamil Nadu (TN)");
+      setCurrency("INR");
+      setTimezone("Asia/Kolkata");
+      if (setLanguage) setLanguage("en");
+    }
+    if (showToast) showToast("Unsaved changes discarded. Saved values restored.");
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -136,8 +184,8 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
       const genPayload = {
         appName,
         defaultState,
-        currency: "INR (₹)",
-        timezone: "Asia/Kolkata",
+        currency,
+        timezone,
         language
       };
       await fetch("/api/settings/general", {
@@ -163,6 +211,13 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
         setBusinessProfile(data.business_profile);
         if (onRefreshData) onRefreshData();
       }
+      setSavedSettings({
+        appName,
+        defaultState,
+        currency,
+        timezone,
+        language
+      });
       if (showToast) showToast("General Settings saved successfully! Default State updated.");
     } catch (err) {
       console.error(err);
@@ -208,16 +263,29 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
 
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Default Currency", "Default Currency")}</label>
-          <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900">
-            <option>INR (₹)</option>
-            <option>USD ($)</option>
+          <select 
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900"
+          >
+            <option value="INR">INR (₹)</option>
+            <option value="USD">USD ($)</option>
           </select>
         </div>
 
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t("Timezone", "Timezone")}</label>
-          <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900">
-            <option>(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
+          <select 
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-brand-50/50 focus:border-brand-500 text-sm font-semibold text-slate-900"
+          >
+            <option value="Asia/Kolkata">(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
+            <option value="UTC">(GMT+00:00) UTC</option>
+            <option value="America/New_York">(GMT-05:00) Eastern Time (US & Canada)</option>
+            <option value="Europe/London">(GMT+00:00) London, Edinburgh</option>
+            <option value="Asia/Dubai">(GMT+04:00) Dubai, Abu Dhabi</option>
+            <option value="Asia/Singapore">(GMT+08:00) Singapore</option>
           </select>
         </div>
 
@@ -238,11 +306,18 @@ function GeneralSettings({ businessProfile, setBusinessProfile, showToast, onRef
         </div>
       </div>
 
-      <div className="flex justify-end pt-4 border-t border-slate-100">
+      <div className="flex justify-end items-center gap-3 pt-4 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-all text-xs uppercase tracking-wider cursor-pointer"
+        >
+          Reset
+        </button>
         <button
           type="submit"
           disabled={isSaving}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-brand-200 text-xs uppercase tracking-wider"
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-brand-200 text-xs uppercase tracking-wider cursor-pointer"
         >
           <Save size={16} />
           {isSaving ? "Saving..." : "Save General Settings"}

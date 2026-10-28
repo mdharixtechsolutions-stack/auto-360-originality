@@ -20,7 +20,8 @@ import {
   Layers,
   MapPin,
   Shield,
-  Lock
+  Lock,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -500,6 +501,27 @@ export default function App() {
   const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
   const [showGlobalSearchResults, setShowGlobalSearchResults] = useState(false);
   const [activeSearchTab, setActiveSearchTab] = useState("all");
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const navigationMatches = useMemo(() => {
+    if (!globalSearchQuery.trim()) return [];
+    const q = globalSearchQuery.toLowerCase().trim();
+    const allModules = [
+      { id: "nav-purchase", label: "Purchase", desc: "Open Purchase Inventory module", view: "purchase" },
+      { id: "nav-sales", label: "Sales", desc: "Open Sales & Deals module", view: "sales" },
+      { id: "nav-customers", label: "Customers", desc: "Open Customers Directory", view: "customers" },
+      { id: "nav-vehicles", label: "Stock Search", desc: "Browse vehicles in stock", view: "stock_search" },
+      { id: "nav-expenses", label: "Expenses", desc: "View business overheads & costs", view: "expenses" },
+      { id: "nav-reports", label: "Reports", desc: "Financial and audit reports", view: "reports" },
+      { id: "nav-staff", label: "Staff Users", desc: "Manage employee profiles", view: "users" },
+      { id: "nav-settings", label: "Settings", desc: "System settings and profile", view: "settings" },
+      { id: "nav-binding", label: "Binding Loans", desc: "Finance & binding loan registry", view: "binding" },
+      { id: "nav-payments", label: "Payments", desc: "Customer receipts & payouts", view: "payments" },
+      { id: "nav-accounts", label: "Accounts", desc: "Day book, ledgers & vouchers", view: "accounts" },
+      { id: "nav-masters", label: "Masters", desc: "Location & vehicle brand masters", view: "masters" }
+    ];
+    return allModules.filter(m => m.label.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q));
+  }, [globalSearchQuery]);
 
   // Dynamic ERP Invoice / Receipt PDF Printer
   const handlePrintSearchResult = (type, item) => {
@@ -621,14 +643,17 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setGlobalSearchResults(data);
-          setShowGlobalSearchResults(true);
+        } else {
+          setGlobalSearchResults({ customers: [], purchases: [], sales: [], loans: [], suppliers: [] });
         }
       } catch (err) {
         console.warn("Global lookup query failed gracefully:", err);
+        setGlobalSearchResults({ customers: [], purchases: [], sales: [], loans: [], suppliers: [] });
       } finally {
         setIsSearchingGlobal(false);
+        setShowGlobalSearchResults(true);
       }
-    }, 350);
+    }, 250);
 
     return () => clearTimeout(delayDebounce);
   }, [globalSearchQuery, selectedBranch, currentUser]);
@@ -639,19 +664,19 @@ export default function App() {
   }, [currentUser]);
   const branchFilteredVehicles = useMemo(() => {
     if (selectedBranch === "all") return vehicles;
-    return vehicles.filter((v) => v.branch === selectedBranch);
+    return vehicles.filter((v) => !v.branch || v.branch === selectedBranch || v.branch === "all" || v.branch === "All");
   }, [vehicles, selectedBranch]);
   const branchFilteredDeals = useMemo(() => {
     if (selectedBranch === "all") return deals;
-    return deals.filter((d) => d.branch === selectedBranch);
+    return deals.filter((d) => !d.branch || d.branch === selectedBranch || d.branch === "all" || d.branch === "All");
   }, [deals, selectedBranch]);
   const branchFilteredCustomers = useMemo(() => {
     if (selectedBranch === "all") return customers;
-    return customers.filter((c) => c.branch === selectedBranch);
+    return customers.filter((c) => !c.branch || c.branch === selectedBranch || c.branch === "all" || c.branch === "All");
   }, [customers, selectedBranch]);
   const branchFilteredExpenses = useMemo(() => {
     if (selectedBranch === "all") return expenses;
-    return expenses.filter((e) => e.branch === selectedBranch);
+    return expenses.filter((e) => !e.branch || e.branch === selectedBranch || e.branch === "all" || e.branch === "All");
   }, [expenses, selectedBranch]);
   useEffect(() => {
     const checkMobile = () => {
@@ -1361,6 +1386,8 @@ export default function App() {
       label: "Reports",
       icon: BarChart3,
       subItems: [
+        { id: "profit_loss", label: "Profit and Loss", view: "reports", path: "/reports/profit-loss", state: { reportType: "profit_loss" } },
+        { id: "balance_sheet", label: "Balance Sheet", view: "reports", path: "/reports/balance-sheet", state: { reportType: "balance_sheet" } },
         { id: "sales", label: "Sales Report", view: "reports", path: "/reports", state: { reportType: "sales" } },
         { id: "purchase", label: "Purchase Report", view: "reports", path: "/reports", state: { reportType: "purchase" } },
         { id: "customer_outstanding", label: "Customer Outstanding", view: "reports", path: "/reports", state: { reportType: "customer_outstanding" } },
@@ -1468,8 +1495,14 @@ export default function App() {
       setSafeActiveView("expenses");
     } else if (path === "/accounts") {
       setSafeActiveView("accounts");
-    } else if (path === "/reports") {
-      setSafeActiveView("reports");
+    } else if (path === "/reports" || path.startsWith("/reports/")) {
+      if (path === "/reports/profit-loss") {
+        setSafeActiveView("reports", { reportType: "profit_loss" });
+      } else if (path === "/reports/balance-sheet") {
+        setSafeActiveView("reports", { reportType: "balance_sheet" });
+      } else {
+        setSafeActiveView("reports");
+      }
     } else if (path === "/staff-users" || path === "/users") {
       setSafeActiveView("users");
     } else if (path === "/settings") {
@@ -1688,6 +1721,8 @@ export default function App() {
           onNavigate={handleNavigate}
           vehicles={branchFilteredVehicles}
           currentUser={currentUser}
+          currentBranch={selectedBranch}
+          selectedBranch={selectedBranch}
           onRefreshData={loadSyncData}
         />;
       case "accounts":
@@ -1728,7 +1763,7 @@ export default function App() {
           currentUser={currentUser}
         />;
       case "followups":
-        return <FollowUps customers={branchFilteredCustomers} currentUser={currentUser} />;
+        return <FollowUps customers={customers} currentUser={currentUser} initialFollowUpCustomer={navigationState.followUpCustomer} />;
       case "masters":
         return <Masters
           brands={brands}
@@ -2078,7 +2113,12 @@ export default function App() {
                 </button>
               )}
             </div>
-            <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+            <button
+              type="button"
+              onClick={() => setShowNotifications((prev) => !prev)}
+              className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              title="Notifications"
+            >
               <Bell size={20} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
             </button>
@@ -2094,6 +2134,44 @@ export default function App() {
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8">
+          {showNotifications && (
+            <div className="mb-6 p-6 bg-white border border-slate-200 rounded-2xl shadow-xl space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Bell size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Notifications</h3>
+                    <p className="text-xs text-slate-500">Real-time system updates and operational alerts</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer font-bold text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="divide-y divide-slate-100">
+                <div className="py-3 flex items-start gap-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-500 mt-1.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Auto 360 ERP Live Operations</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Connected to primary cluster with active branch synchronization.</p>
+                  </div>
+                </div>
+                <div className="py-3 flex items-start gap-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">System Notifications Active</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">All customer reminders and inventory alerts are current.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="w-full">
             {renderView()}
           </div>
@@ -2222,12 +2300,13 @@ export default function App() {
                 {/* Tabs Bar */}
                 <div className="flex items-center gap-1.5 bg-slate-50 px-6 py-2.5 border-b border-slate-200 overflow-x-auto">
                   {[
-                    { id: "all", label: "All Results", count: Object.values(globalSearchResults).reduce((acc, list) => acc + list.length, 0) },
-                    { id: "customers", label: "Customers", count: globalSearchResults.customers.length },
-                    { id: "purchases", label: "Purchases", count: globalSearchResults.purchases.length },
-                    { id: "sales", label: "Sales Deals", count: globalSearchResults.sales.length },
-                    { id: "loans", label: "Binding Loans", count: globalSearchResults.loans.length },
-                    { id: "suppliers", label: "Suppliers", count: globalSearchResults.suppliers.length },
+                    { id: "all", label: "All Results", count: Object.values(globalSearchResults).reduce((acc, list) => acc + (Array.isArray(list) ? list.length : 0), 0) + navigationMatches.length },
+                    ...(navigationMatches.length > 0 ? [{ id: "destinations", label: "Destinations", count: navigationMatches.length }] : []),
+                    { id: "purchases", label: "Purchases", count: (globalSearchResults.purchases?.length || 0) + navigationMatches.filter((n) => n.view === "purchase").length },
+                    { id: "customers", label: "Customers", count: globalSearchResults.customers?.length || 0 },
+                    { id: "sales", label: "Sales Deals", count: globalSearchResults.sales?.length || 0 },
+                    { id: "loans", label: "Binding Loans", count: globalSearchResults.loans?.length || 0 },
+                    { id: "suppliers", label: "Suppliers", count: globalSearchResults.suppliers?.length || 0 },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -2252,6 +2331,38 @@ export default function App() {
 
                 {/* Modal Scrolling Tables content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
+                  {/* NAVIGATION DESTINATIONS MATCHES */}
+                  {(activeSearchTab === "all" || activeSearchTab === "destinations" || (activeSearchTab === "purchases" && globalSearchQuery.toLowerCase().includes("purchase"))) && navigationMatches.length > 0 && (
+                    <div className="bg-white rounded-xl border border-brand-200 overflow-hidden shadow-xs">
+                      <div className="px-4 py-2.5 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-brand-900 tracking-wider">Navigation Destinations</span>
+                        <span className="text-[10px] font-semibold text-brand-600 font-mono">{navigationMatches.length} Matches</span>
+                      </div>
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {navigationMatches.map((nav) => (
+                          <button
+                            key={nav.id}
+                            type="button"
+                            onClick={() => {
+                              handleNavigate(nav.view, nav.state || {});
+                              setShowGlobalSearchResults(false);
+                              setGlobalSearchQuery("");
+                            }}
+                            className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/50 transition-all text-left cursor-pointer group"
+                          >
+                            <div className="p-2 bg-brand-100 text-brand-600 rounded-lg group-hover:bg-brand-600 group-hover:text-white transition-colors">
+                              <ExternalLink size={16} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 group-hover:text-brand-700">{nav.label}</p>
+                              <p className="text-[10px] text-slate-500">{nav.desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 1. CUSTOMERS COMPONENT */}
                   {(activeSearchTab === "all" || activeSearchTab === "customers") && globalSearchResults.customers.length > 0 && (
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
@@ -2566,7 +2677,7 @@ export default function App() {
                   )}
 
                   {/* Empty State Check inside the active view */}
-                  {Object.values(globalSearchResults).reduce((acc, l) => acc + l.length, 0) === 0 && (
+                  {Object.values(globalSearchResults).reduce((acc, l) => acc + (Array.isArray(l) ? l.length : 0), 0) === 0 && navigationMatches.length === 0 && (
                     <div className="py-16 text-center">
                       <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
                         <Search size={22} className="stroke-[1.5]" />

@@ -2,19 +2,20 @@ import fs from "fs";
 import path from "path";
 
 // Standard categories, branches, and lists
-const BRANCHES = ["Tiruppur"];
-const BR_IDS = { "Tiruppur": "BR001" };
+const BRANCHES = ["Tiruppur", "Coimbatore"];
+const BR_IDS = { "Tiruppur": "BR001", "Coimbatore": "BR002" };
 
-const CAR_BRANDS = ["Maruti Suzuki", "Hyundai", "Tata", "Honda", "Mahindra", "Toyota", "Kia", "Renault"];
+const CAR_BRANDS = ["Maruti Suzuki", "Hyundai", "Tata", "Honda", "Mahindra", "Toyota", "Kia", "Renault", "TVS"];
 const BRAND_MODELS = {
   "Maruti Suzuki": ["Swift", "Baleno", "Brezza", "Ertiga", "Dzire"],
   "Hyundai": ["i20", "Creta", "Verna", "Venue", "Grand i10"],
   "Tata": ["Nexon", "Punch", "Harrier", "Altroz", "Tiago"],
-  "Honda": ["City", "Amaze", "Civic", "WR-V"],
+  "Honda": ["Activa", "City", "Amaze", "Civic", "WR-V"],
   "Mahindra": ["Scorpio", "XUV700", "Thar", "Bolero"],
   "Toyota": ["Innova Crysta", "Fortuner", "Glanza", "Urban Cruiser"],
   "Kia": ["Seltos", "Sonet", "Carens"],
-  "Renault": ["Kwid", "Triber", "Kiger"]
+  "Renault": ["Kwid", "Triber", "Kiger"],
+  "TVS": ["Jupiter", "Apache RTR", "iQube", "XL100"]
 };
 
 const FUEL_TYPES = ["Petrol", "Diesel", "CNG", "Electric"];
@@ -101,6 +102,35 @@ export function seedDatabase(db, force = false) {
     { id: "sa3", areaId: "a3", name: "G N Chetty Road", isDeleted: false, createdBy: "Admin", createdAt: new Date().toISOString() }
   ];
 
+  db.branches = [
+    {
+      id: "BR001",
+      name: "Tiruppur",
+      mobile: "9876500001",
+      email: "tiruppur@auto360.com",
+      address: "Tiruppur Main Road",
+      city: "Tiruppur",
+      area: "Tiruppur Centre",
+      subArea: "Main Road",
+      status: "Active",
+      isDeleted: false,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: "BR002",
+      name: "Coimbatore",
+      mobile: "9876500002",
+      email: "coimbatore@auto360.com",
+      address: "Gandhipuram, Coimbatore",
+      city: "Coimbatore",
+      area: "Gandhipuram",
+      subArea: "Cross Cut Road",
+      status: "Active",
+      isDeleted: false,
+      createdAt: new Date().toISOString()
+    }
+  ];
+
   db.customers = [];
   db.suppliers = [];
   db.purchases = [];
@@ -111,10 +141,125 @@ export function seedDatabase(db, force = false) {
   db.login_reports = [];
   db.login_audit = [];
 
-  // 1. Generate 100 Customers
-  console.log("Generating 100 Customers...");
-  const customerDates = generateDates(100);
-  for (let i = 1; i <= 100; i++) {
+  // Deterministic core customers for test flows
+  const deterministicCustomers = [
+    {
+      customer_id: "CUS001",
+      customer_type: "Sell",
+      customer_name: "Vignesh Kumar",
+      customer_mobile: "9876543210",
+      source: "Walk In",
+      aadhaar_number: "987612345678",
+      pan_number: "ABCDE1234F",
+      city_id: "c2",
+      area_id: "a1",
+      sub_area_id: "sa1",
+      address: "123 Main St, Coimbatore",
+      customer_photo: "",
+      aadhaar_photo: "",
+      pan_photo: "",
+      customer_status: "New Lead",
+      preferred_vehicle: "Honda Activa",
+      remarks_notes: "Looking for used scooter or car",
+      created_at: "2026-10-15T09:00:00.000Z",
+      updated_at: "2026-10-15T09:00:00.000Z",
+      branch: "Coimbatore"
+    },
+    {
+      customer_id: "CUS002",
+      customer_type: "Buy",
+      customer_name: "Ramesh S",
+      customer_mobile: "9876543211",
+      source: "Walk In",
+      aadhaar_number: "876512345678",
+      pan_number: "BCDEF2345G",
+      city_id: "c2",
+      area_id: "a2",
+      sub_area_id: "sa2",
+      address: "45 Cross Cut Rd, Coimbatore",
+      customer_photo: "",
+      aadhaar_photo: "",
+      pan_photo: "",
+      customer_status: "Follow Up",
+      preferred_vehicle: "Maruti Suzuki Swift",
+      remarks_notes: "Requested quotation",
+      created_at: "2026-10-18T10:00:00.000Z",
+      updated_at: "2026-10-18T10:00:00.000Z",
+      branch: "Coimbatore"
+    },
+    {
+      customer_id: "CUS003",
+      customer_type: "Buy",
+      customer_name: "Priya Sharma",
+      customer_mobile: "9876543212",
+      source: "Online",
+      aadhaar_number: "765412345678",
+      pan_number: "CDEFG3456H",
+      city_id: "c1",
+      area_id: "a3",
+      sub_area_id: "sa3",
+      address: "12 Bazaar St, Tiruppur",
+      customer_photo: "",
+      aadhaar_photo: "",
+      pan_photo: "",
+      customer_status: "New Lead",
+      preferred_vehicle: "Hyundai i20",
+      remarks_notes: "Test drive scheduled",
+      created_at: "2026-10-19T11:00:00.000Z",
+      updated_at: "2026-10-19T11:00:00.000Z",
+      branch: "Tiruppur"
+    },
+    {
+      customer_id: "CUS004",
+      customer_type: "Buy",
+      customer_name: "Suresh Raina",
+      customer_mobile: "9876543210",
+      source: "Reference",
+      aadhaar_number: "654312345678",
+      pan_number: "DEFGH4567J",
+      city_id: "c2",
+      area_id: "a1",
+      sub_area_id: "sa1",
+      address: "78 Gandhipuram, Coimbatore",
+      customer_photo: "",
+      aadhaar_photo: "",
+      pan_photo: "",
+      customer_status: "Converted",
+      preferred_vehicle: "Maruti Suzuki Swift",
+      remarks_notes: "Bought Swift in Coimbatore",
+      created_at: "2026-10-20T10:00:00.000Z",
+      updated_at: "2026-10-20T10:00:00.000Z",
+      branch: "Coimbatore"
+    },
+    {
+      customer_id: "CUS005",
+      customer_type: "Buy",
+      customer_name: "Amit Kumar",
+      customer_mobile: "9876543211",
+      source: "Walk In",
+      aadhaar_number: "543212345678",
+      pan_number: "EFGHI5678K",
+      city_id: "c2",
+      area_id: "a2",
+      sub_area_id: "sa2",
+      address: "10 Avinashi Rd, Coimbatore",
+      customer_photo: "",
+      aadhaar_photo: "",
+      pan_photo: "",
+      customer_status: "New Lead",
+      preferred_vehicle: "Toyota Innova Crysta",
+      remarks_notes: "Interested in premium 7-seater",
+      created_at: "2026-10-25T10:00:00.000Z",
+      updated_at: "2026-10-25T10:00:00.000Z",
+      branch: "Coimbatore"
+    }
+  ];
+  db.customers.push(...deterministicCustomers);
+
+  // 1. Generate remaining Customers to make 100
+  console.log("Generating remaining Customers...");
+  const customerDates = generateDates(95);
+  for (let i = 6; i <= 100; i++) {
     const firstName = getRandomItem(FIRST_NAMES);
     const lastName = getRandomItem(LAST_NAMES);
     const fullName = `${firstName} ${lastName}`;
@@ -139,16 +284,30 @@ export function seedDatabase(db, force = false) {
       customer_status: getRandomItem(LEAD_STATUSES),
       preferred_vehicle: `${getRandomItem(CAR_BRANDS)} ${getRandomItem(BRAND_MODELS[CAR_BRANDS[0]])}`,
       remarks_notes: "Prefers well maintained model.",
-      created_at: new Date(customerDates[i - 1]).toISOString(),
-      updated_at: new Date(customerDates[i - 1]).toISOString(),
+      created_at: new Date(customerDates[i - 6]).toISOString(),
+      updated_at: new Date(customerDates[i - 6]).toISOString(),
       branch: branch
     });
   }
 
   // 2. Generate 50 Vehicle Owners (Suppliers)
   console.log("Generating 50 Vehicle Owners / Suppliers...");
-  const supplierDates = generateDates(50);
-  for (let i = 1; i <= 50; i++) {
+  // Deterministic supplier for test flows
+  db.suppliers.push({
+    supplier_id: "SUP001",
+    supplier_name: "Sakthi show room",
+    supplier_mobile: "1234567890",
+    city_id: "c2",
+    area_id: "a1",
+    sub_area_id: "sa1",
+    address: "Bazaar Road, Coimbatore",
+    created_at: "2026-08-08T11:01:12.853Z",
+    updated_at: "2026-08-08T11:01:12.853Z",
+    branch: "Coimbatore"
+  });
+
+  const supplierDates = generateDates(49);
+  for (let i = 2; i <= 50; i++) {
     const firstName = getRandomItem(FIRST_NAMES);
     const lastName = getRandomItem(LAST_NAMES);
     const fullName = `${firstName} ${lastName}`;
@@ -162,8 +321,8 @@ export function seedDatabase(db, force = false) {
       area_id: getRandomItem(["a1", "a2"]),
       sub_area_id: getRandomItem(["sa1", "sa2"]),
       address: `${getRandomInt(10, 300)} Main Bazaar Road, ${branch}`,
-      created_at: new Date(supplierDates[i - 1]).toISOString(),
-      updated_at: new Date(supplierDates[i - 1]).toISOString(),
+      created_at: new Date(supplierDates[i - 2]).toISOString(),
+      updated_at: new Date(supplierDates[i - 2]).toISOString(),
       branch: branch
     });
   }
@@ -181,21 +340,28 @@ export function seedDatabase(db, force = false) {
     // Pick a supplier randomly
     const supplier = getRandomItem(db.suppliers);
 
-    // Purchase attributes
-    const purchasePrice = getRandomInt(250000, 850000);
-    const advancePrice = getRandomItem([purchasePrice, getRandomInt(20000, 100000)]);
+    // Determine vehicle type and prices
+    let vehicleType = getRandomItem(VEHICLE_TYPES);
+    if (brand === "TVS" || model === "Activa" || model === "Jupiter" || model === "Apache RTR" || model === "iQube" || model === "XL100") {
+      vehicleType = "Two Wheeler";
+    }
+
+    let purchasePrice = getRandomInt(250000, 850000);
+    if (vehicleType === "Two Wheeler") {
+      purchasePrice = getRandomInt(28000, 48000);
+    }
+    const advancePrice = getRandomItem([purchasePrice, Math.round(purchasePrice * 0.5)]);
     const balancePrice = purchasePrice - advancePrice;
     
     // Expenses
-    const fuelExp = getRandomItem([0, 0, 500, 1000, 1500]);
-    const repairExp = getRandomItem([0, 0, 2000, 5000, 12000]);
-    const serviceExp = getRandomItem([0, 1500, 3000, 6000]);
-    const insExp = getRandomItem([0, 0, 4500, 8000]);
-    const rtoExp = getRandomItem([0, 0, 1500, 2500]);
-    const otherExp = getRandomItem([0, 0, 1000, 3000]);
+    const fuelExp = getRandomItem([0, 0, 500, 1000]);
+    const repairExp = getRandomItem([0, 0, 1500, 4000]);
+    const serviceExp = getRandomItem([0, 1000, 2500]);
+    const insExp = getRandomItem([0, 0, 2000, 4000]);
+    const rtoExp = getRandomItem([0, 0, 1000, 1500]);
+    const otherExp = getRandomItem([0, 0, 500, 1500]);
     const totalRefurbExpenses = fuelExp + repairExp + serviceExp + insExp + rtoExp + otherExp;
 
-    const vehicleType = getRandomItem(VEHICLE_TYPES);
     const regNo = `TN-${getRandomInt(30, 99)}-AB-${String(1000 + i)}`;
 
     // Set status. Half are available, half sold.
@@ -264,8 +430,6 @@ export function seedDatabase(db, force = false) {
     db.purchases.push(newPurchase);
 
     // DOUBLE ENTRY posting for purchase:
-    // DR Purchase Accounts
-    // CR Cash / Bank Accounts (based on mode)
     const pVouchId = `PUR-${String(i).padStart(4, "0")}`;
     db.vouchers.push({
       id: pVouchId,
@@ -281,7 +445,6 @@ export function seedDatabase(db, force = false) {
       branch: branch
     });
 
-    // If there is any refurb expense, post separate payment vouchers
     if (totalRefurbExpenses > 0) {
       const expenseVouchId = `EXP-P${String(i).padStart(3, "0")}`;
       db.vouchers.push({
@@ -299,6 +462,354 @@ export function seedDatabase(db, force = false) {
       });
     }
   }
+
+  // Deterministic vehicles for test suite flows
+  const deterministicPurchases = [
+    {
+      purchase_id: "PUR-HA01",
+      purchase_date: "2026-10-15",
+      purchase_type: "Customer",
+      seller_id: "CUS001",
+      seller_name: "Vignesh Kumar",
+      seller_mobile: "9876543210",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "123 Main St, Coimbatore",
+      vehicle_type: "Two Wheeler",
+      brand_id: "Honda",
+      vehicle_name_id: "Activa",
+      reg_no: "TN-38-HA-1234",
+      model_details: "6G Deluxe",
+      year: 2022,
+      fuel_type: "Petrol",
+      tyre_status: "Good (80%)",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892110",
+      chassis_number: "CHA892110",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 35000,
+      advance_price: 35000,
+      balance_amount: 0,
+      consultancy_fees: 2000,
+      expected_selling_price: 45000,
+      payment_mode: "Cash",
+      status: "Available",
+      created_at: "2026-10-15T10:00:00.000Z",
+      updated_at: "2026-10-15T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 500,
+      repair_expense: 0,
+      service_expense: 1000,
+      insurance_expense: 0,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    },
+    {
+      purchase_id: "PUR-TJ01",
+      purchase_date: "2026-10-16",
+      purchase_type: "Supplier",
+      seller_id: "SUP001",
+      seller_name: "Sakthi show room",
+      seller_mobile: "1234567890",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "Bazaar Road, Coimbatore",
+      vehicle_type: "Two Wheeler",
+      brand_id: "TVS",
+      vehicle_name_id: "Jupiter",
+      reg_no: "TN-38-TJ-5678",
+      model_details: "ZX SmartXonnect",
+      year: 2023,
+      fuel_type: "Petrol",
+      tyre_status: "Brand New",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892111",
+      chassis_number: "CHA892111",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 32000,
+      advance_price: 32000,
+      balance_amount: 0,
+      consultancy_fees: 2000,
+      expected_selling_price: 42000,
+      payment_mode: "UPI",
+      status: "Available",
+      created_at: "2026-10-16T10:00:00.000Z",
+      updated_at: "2026-10-16T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 500,
+      repair_expense: 0,
+      service_expense: 500,
+      insurance_expense: 0,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    },
+    {
+      purchase_id: "PUR-MS01",
+      purchase_date: "2026-10-18",
+      purchase_type: "Customer",
+      seller_id: "CUS001",
+      seller_name: "Vignesh Kumar",
+      seller_mobile: "9876543210",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "123 Main St, Coimbatore",
+      vehicle_type: "Four Wheeler",
+      brand_id: "Maruti Suzuki",
+      vehicle_name_id: "Swift",
+      reg_no: "TN-38-MS-9012",
+      model_details: "VXI",
+      year: 2021,
+      fuel_type: "Petrol",
+      tyre_status: "Good (80%)",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892112",
+      chassis_number: "CHA892112",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 380000,
+      advance_price: 380000,
+      balance_amount: 0,
+      consultancy_fees: 5000,
+      expected_selling_price: 430000,
+      payment_mode: "Bank Transfer",
+      status: "Available",
+      created_at: "2026-10-18T10:00:00.000Z",
+      updated_at: "2026-10-18T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 1000,
+      repair_expense: 2000,
+      service_expense: 3000,
+      insurance_expense: 4000,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    },
+    {
+      purchase_id: "PUR-TI01",
+      purchase_date: "2026-10-20",
+      purchase_type: "Supplier",
+      seller_id: "SUP001",
+      seller_name: "Sakthi show room",
+      seller_mobile: "1234567890",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "Bazaar Road, Coimbatore",
+      vehicle_type: "Four Wheeler",
+      brand_id: "Toyota",
+      vehicle_name_id: "Innova Crysta",
+      reg_no: "TN-38-TI-3456",
+      model_details: "2.4 GX 7 STR",
+      year: 2022,
+      fuel_type: "Diesel",
+      tyre_status: "Good (80%)",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892113",
+      chassis_number: "CHA892113",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 850000,
+      advance_price: 850000,
+      balance_amount: 0,
+      consultancy_fees: 8000,
+      expected_selling_price: 950000,
+      payment_mode: "Bank Transfer",
+      status: "Available",
+      created_at: "2026-10-20T10:00:00.000Z",
+      updated_at: "2026-10-20T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 1500,
+      repair_expense: 3000,
+      service_expense: 5000,
+      insurance_expense: 6000,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    },
+    {
+      purchase_id: "PUR-SUP01",
+      purchase_date: "2026-10-21",
+      purchase_type: "Supplier",
+      seller_id: "SUP001",
+      seller_name: "Sakthi show room",
+      seller_mobile: "1234567890",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "Bazaar Road, Coimbatore",
+      vehicle_type: "Four Wheeler",
+      brand_id: "Hyundai",
+      vehicle_name_id: "Creta",
+      reg_no: "TN-38-CR-7788",
+      model_details: "SX 1.5 Petrol",
+      year: 2022,
+      fuel_type: "Petrol",
+      tyre_status: "Good (80%)",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892114",
+      chassis_number: "CHA892114",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 200000,
+      advance_price: 150000,
+      balance_amount: 50000,
+      consultancy_fees: 5000,
+      expected_selling_price: 240000,
+      payment_mode: "Bank Transfer",
+      status: "Available",
+      created_at: "2026-10-21T10:00:00.000Z",
+      updated_at: "2026-10-21T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 0,
+      repair_expense: 0,
+      service_expense: 0,
+      insurance_expense: 0,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    },
+    {
+      purchase_id: "PUR-CUS01",
+      purchase_date: "2026-10-22",
+      purchase_type: "Customer",
+      seller_id: "CUS001",
+      seller_name: "Vignesh Kumar",
+      seller_mobile: "9876543210",
+      seller_city_id: "c2",
+      seller_area_id: "a1",
+      seller_sub_area_id: "sa1",
+      seller_address: "123 Main St, Coimbatore",
+      vehicle_type: "Four Wheeler",
+      brand_id: "Tata",
+      vehicle_name_id: "Nexon",
+      reg_no: "TN-38-NX-9900",
+      model_details: "XZ+",
+      year: 2021,
+      fuel_type: "Diesel",
+      tyre_status: "Good (80%)",
+      rc_type: "Original RC",
+      owner_details: "1st Owner",
+      engine_number: "ENG892115",
+      chassis_number: "CHA892115",
+      rc_available: "Yes",
+      challan_pending: "No",
+      noc_available: "Yes",
+      insurance_active: "Yes",
+      vehicle_image: "",
+      rc_upload: "",
+      noc_upload: "",
+      insurance_doc: "",
+      purchase_price: 180000,
+      advance_price: 140000,
+      balance_amount: 40000,
+      consultancy_fees: 4000,
+      expected_selling_price: 215000,
+      payment_mode: "Cash",
+      status: "Available",
+      created_at: "2026-10-22T10:00:00.000Z",
+      updated_at: "2026-10-22T10:00:00.000Z",
+      isDeleted: false,
+      fuel_expense: 0,
+      repair_expense: 0,
+      service_expense: 0,
+      insurance_expense: 0,
+      rto_expense: 0,
+      other_expense: 0,
+      sold_to_customer_id: "",
+      sold_date: "",
+      selling_price: 0,
+      sold_advance_amount: 0,
+      sold_consultancy_fees: 0,
+      sold_aadhaar_number: "",
+      sold_pan_number: "",
+      sold_status: "Pending",
+      branch: "Coimbatore"
+    }
+  ];
+
+  db.purchases.push(...deterministicPurchases);
 
   // 4. Generate 75 Buying Deals & 75 Selling Deals
   console.log("Generating 75 Buying Deals & 75 Selling Deals...");
@@ -524,6 +1035,88 @@ export function seedDatabase(db, force = false) {
       branch: veh.branch
     });
   }
+
+  // Deterministic deals for test suite flows
+  db.deals.push(
+    {
+      id: "S-1001",
+      customerId: "CUS005",
+      customerName: "Amit Kumar",
+      vehicleId: "PUR-TI01",
+      vehicleName: "Toyota Innova Crysta",
+      type: "Sell",
+      purchasePrice: 850000,
+      expenses: 15500,
+      sellingPrice: 950000,
+      totalPrice: 958000,
+      advanceAmount: 883000,
+      balanceAmount: 75000,
+      pendingBalance: 75000,
+      consultancyFees: 8000,
+      commission: 19000,
+      assignedAgentId: "S-1",
+      agent: "John Super Admin",
+      status: "Pending",
+      date: "2026-10-22",
+      createdBy: "S-1",
+      createdAt: "2026-10-22T10:00:00.000Z",
+      isDeleted: false,
+      aadhaarNumber: "543212345678",
+      panNumber: "EFGHI5678K",
+      uploads: { photo: null, aadhaar: null, pan: null },
+      branch: "Coimbatore"
+    },
+    {
+      id: "S-1002",
+      customerId: "CUS004",
+      customerName: "Suresh Raina",
+      vehicleId: "PUR-MS01",
+      vehicleName: "Maruti Suzuki Swift",
+      type: "Sell",
+      purchasePrice: 380000,
+      expenses: 10000,
+      sellingPrice: 430000,
+      totalPrice: 435000,
+      advanceAmount: 435000,
+      balanceAmount: 0,
+      pendingBalance: 0,
+      consultancyFees: 5000,
+      commission: 8600,
+      assignedAgentId: "S-1",
+      agent: "John Super Admin",
+      status: "Completed",
+      date: "2026-10-24",
+      createdBy: "S-1",
+      createdAt: "2026-10-24T10:00:00.000Z",
+      isDeleted: false,
+      aadhaarNumber: "654312345678",
+      panNumber: "DEFGH4567J",
+      uploads: { photo: null, aadhaar: null, pan: null },
+      branch: "Coimbatore"
+    }
+  );
+
+  // Deterministic loan for test suite flows
+  db.loans.push({
+    id: "LN001",
+    loanType: "Binding",
+    purchaseId: "PUR-TI01",
+    vehicleDetails: "Toyota Innova Crysta (TN-38-TI-3456)",
+    regNo: "TN-38-TI-3456",
+    customerName: "Amit Kumar",
+    borrower_name: "Amit Kumar",
+    mobileNumber: "9876543211",
+    loanDate: "2026-10-22",
+    financeName: "HDFC Bank",
+    loan_amount: 150000,
+    bindingAmount: 150000,
+    takenAmount: 140000,
+    status: "Active",
+    isDeleted: false,
+    branch: "Coimbatore",
+    createdBy: "S-1",
+    createdAt: "2026-10-22T10:00:00.000Z"
+  });
 
   // 6. Generate 12 Months of General Business Expenses
   console.log("Generating 12 months of general business expenses...");
