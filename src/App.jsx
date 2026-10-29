@@ -2090,14 +2090,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
-            <div className="hidden md:flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-transparent focus-within:border-brand-500 focus-within:bg-white transition-all shadow-sm">
-              <Search size={16} className={`${isSearchingGlobal ? "text-brand-500 animate-spin" : "text-slate-400"}`} />
+            <div className="hidden md:flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200 focus-within:border-brand-500 focus-within:bg-white transition-all shadow-sm">
+              <Search size={16} className={`${isSearchingGlobal ? "text-brand-500 animate-spin" : "text-slate-500"}`} />
               <input
                 type="text"
                 placeholder="Search Customer ID, Purchase ID, Sales ID, Loan ID, Supplier ID..."
                 value={globalSearchQuery}
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                className="bg-transparent border-none focus:ring-0 text-xs w-64 lg:w-[480px] ml-2 outline-none"
+                className="bg-transparent border-none focus:ring-0 text-xs w-64 lg:w-[480px] ml-2 outline-none text-slate-900 font-medium placeholder:text-slate-500"
               />
               {globalSearchQuery && (
                 <button

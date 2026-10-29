@@ -18,8 +18,81 @@
 }
 
 @layer base {
-  body {
+  :root {
+    color-scheme: light;
+  }
+  html, body {
+    color-scheme: light;
     @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    color: #0f172a;
+  }
+
+  /* Universal Input & Control High-Contrast Dark Text */
+  input:not([class*="bg-slate-900"]):not([class*="bg-slate-800"]):not([class*="text-white"]):not([class*="bg-gray-900"]),
+  select:not([class*="bg-slate-900"]):not([class*="bg-slate-800"]):not([class*="text-white"]):not([class*="bg-gray-900"]),
+  textarea:not([class*="bg-slate-900"]):not([class*="bg-slate-800"]):not([class*="text-white"]):not([class*="bg-gray-900"]) {
+    color: #0f172a !important;
+    color-scheme: light;
+  }
+
+  /* Universal High-Contrast Visible Placeholders */
+  input::placeholder,
+  textarea::placeholder,
+  .placeholder\:text-slate-400::placeholder,
+  .placeholder\:text-slate-300::placeholder,
+  .placeholder\:text-gray-400::placeholder {
+    color: #475569 !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+  }
+
+  /* Calendar & Date/Time Inputs across all browsers */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  input[type="month"],
+  input[type="week"] {
+    color: #0f172a !important;
+    color-scheme: light !important;
+    font-weight: 600 !important;
+  }
+
+  /* WebKit / Chromium Datepicker Text Fields */
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+  input[type="date"]::-webkit-datetime-edit-text,
+  input[type="date"]::-webkit-datetime-edit-month-field,
+  input[type="date"]::-webkit-datetime-edit-day-field,
+  input[type="date"]::-webkit-datetime-edit-year-field,
+  input[type="datetime-local"]::-webkit-datetime-edit,
+  input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper,
+  input[type="datetime-local"]::-webkit-datetime-edit-text,
+  input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+  input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+  input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+  input[type="time"]::-webkit-datetime-edit,
+  input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+  input[type="time"]::-webkit-datetime-edit-text,
+  input[type="time"]::-webkit-datetime-edit-hour-field,
+  input[type="time"]::-webkit-datetime-edit-minute-field,
+  input[type="time"]::-webkit-datetime-edit-ampm-field {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+  }
+
+  /* Calendar picker icon */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.85 !important;
+    filter: brightness(0.2) contrast(1.5) !important;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1 !important;
+    filter: brightness(0) !important;
   }
 }
 

@@ -466,34 +466,34 @@ export default function Accounts({
   }
           <div className="flex flex-wrap items-center gap-3 flex-1">
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
               <input
-    type="text"
-    placeholder={`Search in ${tabs.find((t) => t.id === activeTab)?.label || "Accounts"}...`}
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
-    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-medium"
-  />
+                type="text"
+                placeholder={`Search in ${tabs.find((t) => t.id === activeTab)?.label || "Accounts"}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-semibold text-slate-900 placeholder:text-slate-500"
+              />
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase">From</span>
+              <span className="text-xs font-bold text-slate-600 uppercase">From</span>
               <input
-    type="date"
-    value={localFrom}
-    onChange={(e) => setLocalFrom(e.target.value)}
-    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-medium"
-  />
+                type="date"
+                value={localFrom}
+                onChange={(e) => setLocalFrom(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-semibold text-slate-900"
+              />
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase">To</span>
+              <span className="text-xs font-bold text-slate-600 uppercase">To</span>
               <input
-    type="date"
-    value={localTo}
-    onChange={(e) => setLocalTo(e.target.value)}
-    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-medium"
-  />
+                type="date"
+                value={localTo}
+                onChange={(e) => setLocalTo(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-semibold text-slate-900"
+              />
             </div>
 
             <button
@@ -775,13 +775,13 @@ function LedgerMaster({ ledgers, onAdd, onUpdate, searchQuery, setSearchQuery, o
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h3 className="text-lg font-bold text-slate-900">Ledger Accounts</h3>
         <div className="flex flex-1 max-w-md relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
           <input
             type="text"
             placeholder="Search ledgers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm font-semibold text-slate-900 placeholder:text-slate-500"
           />
         </div>
         {canCreate && (
