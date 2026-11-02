@@ -401,9 +401,34 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   const [voucherEntries, setVoucherEntries] = useState([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("currentUser");
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("currentUser");
+      const loggedInStr = localStorage.getItem("isLoggedIn");
+      const token = localStorage.getItem("sessionToken");
+      return !!(savedUser && (loggedInStr === "true" || token));
+    } catch (e) {
+      return false;
+    }
+  });
+  const [isAuthChecking, setIsAuthChecking] = useState(() => {
+    try {
+      const token = localStorage.getItem("sessionToken");
+      const savedUser = localStorage.getItem("currentUser");
+      return !savedUser && !!token;
+    } catch (e) {
+      return false;
+    }
+  });
   const [loginError, setLoginError] = useState("");
 
   const [isSoftwareOwner, setIsSoftwareOwner] = useState(!!localStorage.getItem("adminToken"));
@@ -412,7 +437,7 @@ export default function App() {
   const [adminAuthCode, setAdminAuthCode] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
 
-  // Verify Session Token on App Load
+  // Verify Session Token on App Load in background without dropping active session on network hiccups
   useEffect(() => {
     const verifySession = async () => {
       try {
@@ -420,14 +445,22 @@ export default function App() {
         const expiry = localStorage.getItem("sessionExpiry");
         const savedUserStr = localStorage.getItem("currentUser");
 
-        if (!token || !savedUserStr || (expiry && Date.now() >= Number(expiry))) {
-          // No valid session stored
+        if (!token || !savedUserStr) {
+          // No valid credentials stored
           localStorage.removeItem("isLoggedIn");
           localStorage.removeItem("currentUser");
           localStorage.removeItem("sessionToken");
           localStorage.removeItem("sessionExpiry");
           setIsLoggedIn(false);
           setCurrentUser(null);
+          setIsAuthChecking(false);
+          return;
+        }
+
+        // If expiry passed 30 days, logout
+        if (expiry && Date.now() >= Number(expiry)) {
+          console.warn("Session token expired by duration (30 days)");
+          handleLogout(true);
           setIsAuthChecking(false);
           return;
         }
@@ -445,21 +478,23 @@ export default function App() {
             setCurrentUser(data.user);
             localStorage.setItem("isLoggedIn", "true");
             localStorage.setItem("currentUser", JSON.stringify(data.user));
-            // Extend session expiry
-            localStorage.setItem("sessionExpiry", (Date.now() + 8 * 60 * 60 * 1000).toString());
+            // Extend session expiry to 30 days
+            localStorage.setItem("sessionExpiry", (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
           } else {
-            throw new Error("Invalid session verification");
+            console.warn("Invalid session verification response");
+            handleLogout(true);
           }
+        } else if (res.status === 401 || res.status === 403) {
+          // Token is definitively invalid, expired or user inactive
+          console.warn("Session verification rejected by server (401/403)");
+          handleLogout(true);
         } else {
-          throw new Error("Session verification rejected by server");
+          // Server returned temporary status (500, 502, etc.) - keep cached session!
+          console.warn("Session re-verification temporary server status:", res.status);
         }
       } catch (err) {
-        localStorage.removeItem("isLoggedIn");
-        localStorage.removeItem("currentUser");
-        localStorage.removeItem("sessionToken");
-        localStorage.removeItem("sessionExpiry");
-        setIsLoggedIn(false);
-        setCurrentUser(null);
+        // Network connection error - keep cached session!
+        console.warn("Network error during session verify, keeping active session:", err);
       } finally {
         setIsAuthChecking(false);
       }
@@ -715,6 +750,7 @@ export default function App() {
 
   const loadSyncData = useCallback(async () => {
     if (!isLoggedIn) return;
+    setIsSyncing(true);
     const safeFetch = async (url) => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1009,7 +1045,7 @@ export default function App() {
       // Store state
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("currentUser", JSON.stringify(user));
-      const expiry = Date.now() + 2 * 60 * 60 * 1000; // 2 hour session
+      const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 day session
       localStorage.setItem("sessionExpiry", expiry.toString());
       localStorage.setItem("sessionToken", data.token);
 
@@ -1224,7 +1260,7 @@ export default function App() {
     navigate("/", { replace: true });
   };
 
-  // Auto session duration timer verification
+  // Auto session duration timer verification (30 days lifecycle)
   useEffect(() => {
     if (!isLoggedIn) return;
     const interval = setInterval(() => {
@@ -1235,9 +1271,9 @@ export default function App() {
           handleLogout(true);
         }
       } else {
-        handleLogout(true);
+        localStorage.setItem("sessionExpiry", (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
       }
-    }, 15 * 1000); // 15 seconds
+    }, 60 * 1000); // Check once every minute
     return () => clearInterval(interval);
   }, [isLoggedIn]);
   const isSubItemPermitted = (sub) => {
@@ -1591,7 +1627,7 @@ export default function App() {
     );
   }
 
-  if (isAuthChecking) {
+  if (!isLoggedIn && isAuthChecking) {
     return (
       <div className="min-h-screen bg-[#02040a] flex flex-col items-center justify-center space-y-3 font-sans select-none">
         <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />

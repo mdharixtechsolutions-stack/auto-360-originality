@@ -3613,7 +3613,10 @@ app.get("/api/auth/verify", (req, res) => {
     }
 
     const db = readDb();
-    const user = (db.users || []).find((u) => u.id === decoded.id && !u.isDeleted);
+    const user = (db.users || []).find((u) => !u.isDeleted && (
+      String(u.id) === String(decoded.id) ||
+      (u.username && decoded.username && u.username.toLowerCase() === decoded.username.toLowerCase())
+    ));
     if (!user || user.isActive === false) {
       return res.status(401).json({ valid: false, error: "User is inactive or not found" });
     }
@@ -3708,7 +3711,7 @@ app.post("/api/login", (req, res) => {
       branch: user.branch
     },
     JWT_SECRET,
-    { expiresIn: "8h" }
+    { expiresIn: "30d" }
   );
 
   // Returns session token and user profile details
