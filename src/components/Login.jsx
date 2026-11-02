@@ -195,13 +195,13 @@ export default function Login({ onLogin, error, businessProfile }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="w-full max-w-[420px] bg-[#0c162b]/90 backdrop-blur-2xl border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] rounded-3xl p-8 sm:p-9 text-white relative"
+            className="w-full max-w-[500px] xl:max-w-[520px] bg-[#0c162b]/95 backdrop-blur-2xl border border-slate-700/70 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] rounded-3xl p-8 sm:p-11 text-white relative"
           >
             {/* Top Company Emblem / Logo */}
-            <div className="flex justify-center mb-5">
+            <div className="flex justify-center mb-6">
               <div className="flex flex-col items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-slate-900/60 p-0.5 border border-cyan-500/30 shadow-lg shadow-cyan-500/20 overflow-hidden shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-900/80 p-1 border border-cyan-500/40 shadow-xl shadow-cyan-500/25 overflow-hidden shrink-0">
                     <img
                       src={businessProfile?.companyLogo || "/logo.svg"}
                       alt="Logo"
@@ -209,33 +209,33 @@ export default function Login({ onLogin, error, businessProfile }) {
                       referrerPolicy="no-referrer"
                     />
                   </div>
-                  <span className="text-2xl font-black uppercase tracking-tight text-white leading-none">
+                  <span className="text-3xl font-black uppercase tracking-tight text-white leading-none">
                     AUTO<span className="text-[#00b4d8]">360</span>
                   </span>
                 </div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mt-2">
                   Auto Consultancy ERP
                 </span>
               </div>
             </div>
 
             {/* Welcome Greeting */}
-            <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight text-center">
+            <h3 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight text-center">
               WELCOME BACK
             </h3>
-            <p className="text-xs text-slate-400 text-center mt-1 mb-6">
+            <p className="text-sm text-slate-400 text-center mt-1.5 mb-7">
               Sign in to continue to your dashboard
             </p>
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <AnimatePresence>
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold rounded-xl"
+                    className="p-3.5 bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs sm:text-sm font-semibold rounded-xl"
                   >
                     {error}
                   </motion.div>
@@ -243,59 +243,59 @@ export default function Login({ onLogin, error, businessProfile }) {
               </AnimatePresence>
 
               {/* USERNAME / EMAIL ADDRESS */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
+              <div className="space-y-2 text-left">
+                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
                   USERNAME / EMAIL ADDRESS
                 </label>
-                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4 py-3 transition-all focus-within:ring-2 focus-within:ring-cyan-500">
-                  <Mail size={16} className="text-slate-500 mr-3 shrink-0" />
+                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
+                  <Mail size={18} className="text-slate-500 mr-3 shrink-0" />
                   <input
                     type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin"
-                    className="w-full bg-transparent text-slate-900 font-semibold text-sm outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-slate-900 font-bold text-sm sm:text-base outline-none placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
               {/* PASSWORD */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
+              <div className="space-y-2 text-left">
+                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
                   PASSWORD
                 </label>
-                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4 py-3 transition-all focus-within:ring-2 focus-within:ring-cyan-500">
-                  <Lock size={16} className="text-slate-500 mr-3 shrink-0" />
+                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
+                  <Lock size={18} className="text-slate-500 mr-3 shrink-0" />
                   <input
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-transparent text-slate-900 font-semibold text-sm outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-slate-900 font-bold text-sm sm:text-base outline-none placeholder:text-slate-400"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="text-slate-500 hover:text-slate-700 cursor-pointer ml-2 outline-none"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
               {/* ASSIGNED BRANCH */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
+              <div className="space-y-2 text-left">
+                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
                   ASSIGNED BRANCH
                 </label>
-                <div className="bg-[#070e20] border border-slate-700/80 rounded-xl flex items-center px-4 py-3 relative">
-                  <MapPin size={16} className="text-slate-400 mr-3 shrink-0" />
+                <div className="bg-[#070e20] border border-slate-700/90 rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 relative shadow-inner">
+                  <MapPin size={18} className="text-slate-400 mr-3 shrink-0" />
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full bg-transparent text-white font-medium text-sm outline-none appearance-none cursor-pointer pr-6"
+                    className="w-full bg-transparent text-white font-bold text-sm sm:text-base outline-none appearance-none cursor-pointer pr-6"
                   >
                     {branches.map((b) => (
                       <option key={b.id || b.name} value={b.name} className="bg-[#0b1329] text-white">
@@ -303,25 +303,25 @@ export default function Login({ onLogin, error, businessProfile }) {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="text-slate-400 absolute right-4 pointer-events-none" />
+                  <ChevronDown size={16} className="text-slate-400 absolute right-4 pointer-events-none" />
                 </div>
               </div>
 
               {/* Remember Me & Change Password */}
-              <div className="flex items-center justify-between text-xs pt-1">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+              <div className="flex items-center justify-between text-xs sm:text-sm pt-1.5">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                    className="w-4.5 h-4.5 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
                   />
-                  <span className="text-slate-300 font-medium">Remember Me</span>
+                  <span className="text-slate-300 font-semibold">Remember Me</span>
                 </label>
                 <button
                   type="button"
                   onClick={handleOpenChangePassword}
-                  className="text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer outline-none"
+                  className="text-cyan-400 hover:text-cyan-300 font-extrabold transition-colors cursor-pointer outline-none"
                 >
                   Change Password?
                 </button>
@@ -331,11 +331,11 @@ export default function Login({ onLogin, error, businessProfile }) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 mt-2 bg-gradient-to-r from-[#0066ff] to-[#00b4d8] text-white font-extrabold text-xs sm:text-sm tracking-wider uppercase rounded-xl flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-cyan-500/25 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
+                className="w-full py-4 mt-3 bg-gradient-to-r from-[#0066ff] to-[#00b4d8] text-white font-black text-sm sm:text-base tracking-wider uppercase rounded-xl flex items-center justify-center gap-2 hover:opacity-95 shadow-xl shadow-cyan-500/30 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
               >
                 {isLoading ? (
                   <>
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
@@ -344,7 +344,7 @@ export default function Login({ onLogin, error, businessProfile }) {
                 ) : (
                   <>
                     <span>SIGN IN TO PLATFORM</span>
-                    <ArrowRight size={16} />
+                    <ArrowRight size={18} />
                   </>
                 )}
               </button>
