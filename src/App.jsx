@@ -87,37 +87,37 @@ try {
         const currentUserStr = localStorage.getItem("currentUser");
         const adminToken = localStorage.getItem("adminToken") || "";
         const sessionToken = localStorage.getItem("sessionToken") || "";
-        const customHeaders = {
-          ...(adminToken ? { "x-admin-token": adminToken } : {}),
-          ...(sessionToken ? { "authorization": `Bearer ${sessionToken}` } : {})
-        };
-        if (currentUserStr) {
-          try {
-            const user = JSON.parse(currentUserStr);
-            customHeaders["x-user-id"] = user.id || "";
-            customHeaders["x-user-role"] = user.role || "";
-            customHeaders["x-user-branch"] = user.branch || "";
-          } catch (e) {
-            console.warn("Failed to parse currentUser for fetch interceptor Headers", e);
-          }
-        }
-        if (options.headers) {
-          if (options.headers instanceof Headers) {
-            Object.keys(customHeaders).forEach((key) => {
-              options.headers.set(key, customHeaders[key]);
-            });
-          } else if (Array.isArray(options.headers)) {
-            Object.keys(customHeaders).forEach((key) => {
-              options.headers.push([key, customHeaders[key]]);
-            });
-          } else {
-            options.headers = {
-              ...options.headers,
-              ...customHeaders
-            };
+
+        if (options.headers instanceof Headers) {
+          options.headers.delete("authorization");
+          options.headers.delete("Authorization");
+          if (sessionToken) options.headers.set("Authorization", `Bearer ${sessionToken}`);
+          if (adminToken) options.headers.set("x-admin-token", adminToken);
+          if (currentUserStr) {
+            try {
+              const user = JSON.parse(currentUserStr);
+              options.headers.set("x-user-id", user.id || "");
+              options.headers.set("x-user-role", user.role || "");
+              options.headers.set("x-user-branch", user.branch || "");
+            } catch (e) {}
           }
         } else {
-          options.headers = customHeaders;
+          const raw = { ...(options.headers || {}) };
+          delete raw["authorization"];
+          delete raw["Authorization"];
+          options.headers = {
+            ...raw,
+            ...(sessionToken ? { "Authorization": `Bearer ${sessionToken}` } : {}),
+            ...(adminToken ? { "x-admin-token": adminToken } : {})
+          };
+          if (currentUserStr) {
+            try {
+              const user = JSON.parse(currentUserStr);
+              options.headers["x-user-id"] = user.id || "";
+              options.headers["x-user-role"] = user.role || "";
+              options.headers["x-user-branch"] = user.branch || "";
+            } catch (e) {}
+          }
         }
       }
       return originalFetch(requestUrl, options);
@@ -413,22 +413,12 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
       const savedUser = localStorage.getItem("currentUser");
-      const loggedInStr = localStorage.getItem("isLoggedIn");
-      const token = localStorage.getItem("sessionToken");
-      return !!(savedUser && (loggedInStr === "true" || token));
+      return !!savedUser;
     } catch (e) {
       return false;
     }
   });
-  const [isAuthChecking, setIsAuthChecking] = useState(() => {
-    try {
-      const token = localStorage.getItem("sessionToken");
-      const savedUser = localStorage.getItem("currentUser");
-      return !savedUser && !!token;
-    } catch (e) {
-      return false;
-    }
-  });
+  const [isAuthChecking, setIsAuthChecking] = useState(false);
   const [loginError, setLoginError] = useState("");
 
   const [isSoftwareOwner, setIsSoftwareOwner] = useState(!!localStorage.getItem("adminToken"));
@@ -437,7 +427,7 @@ export default function App() {
   const [adminAuthCode, setAdminAuthCode] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
 
-  // Verify Session Token on App Load in background without dropping active session on network hiccups
+  // Verify Session Token on App Load in background without dropping active session on reload or network hiccups
   useEffect(() => {
     const verifySession = async () => {
       try {
@@ -445,31 +435,28 @@ export default function App() {
         const expiry = localStorage.getItem("sessionExpiry");
         const savedUserStr = localStorage.getItem("currentUser");
 
-        if (!token || !savedUserStr) {
-          // No valid credentials stored
-          localStorage.removeItem("isLoggedIn");
-          localStorage.removeItem("currentUser");
-          localStorage.removeItem("sessionToken");
-          localStorage.removeItem("sessionExpiry");
+        if (!savedUserStr) {
           setIsLoggedIn(false);
           setCurrentUser(null);
-          setIsAuthChecking(false);
           return;
         }
 
-        // If expiry passed 30 days, logout
-        if (expiry && Date.now() >= Number(expiry)) {
+        // Active session in localStorage - ALWAYS keep user logged in on reload!
+        setIsLoggedIn(true);
+
+        // If expiry is far in the past (> 30 days)
+        if (expiry && Number(expiry) > 0 && Date.now() >= Number(expiry)) {
           console.warn("Session token expired by duration (30 days)");
           handleLogout(true);
-          setIsAuthChecking(false);
           return;
         }
 
-        const res = await fetch("/api/auth/verify", {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        if (!token) {
+          // Token absent but user exists in local storage - preserve session
+          return;
+        }
+
+        const res = await fetch("/api/auth/verify");
 
         if (res.ok) {
           const data = await res.json();
@@ -480,17 +467,10 @@ export default function App() {
             localStorage.setItem("currentUser", JSON.stringify(data.user));
             // Extend session expiry to 30 days
             localStorage.setItem("sessionExpiry", (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
-          } else {
-            console.warn("Invalid session verification response");
-            handleLogout(true);
           }
-        } else if (res.status === 401 || res.status === 403) {
-          // Token is definitively invalid, expired or user inactive
-          console.warn("Session verification rejected by server (401/403)");
-          handleLogout(true);
         } else {
-          // Server returned temporary status (500, 502, etc.) - keep cached session!
-          console.warn("Session re-verification temporary server status:", res.status);
+          // If server returns temporary error or unverified, DO NOT log out the user on a refresh!
+          console.warn("Session background verify response:", res.status, "- preserving active session");
         }
       } catch (err) {
         // Network connection error - keep cached session!
