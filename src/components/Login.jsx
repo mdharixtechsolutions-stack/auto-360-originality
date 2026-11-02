@@ -9,7 +9,8 @@ import {
   EyeOff, 
   Languages, 
   MapPin, 
-  ChevronDown 
+  ChevronDown,
+  X 
 } from "lucide-react";
 import showroomBg from "../assets/images/showroom_background_1781509637762.jpg";
 
@@ -184,7 +185,7 @@ export default function Login({ onLogin, error, businessProfile }) {
           {/* Pill Badge */}
           <div className="pt-1">
             <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#0a1838]/80 border border-blue-500/50 backdrop-blur-md text-xs font-bold tracking-widest text-cyan-300 uppercase shadow-md">
-              {businessProfile?.companyName || "AUTO 360"}
+              {(businessProfile?.companyName && businessProfile.companyName !== "Auto 360" ? businessProfile.companyName : "KOVAI MOTOBIKES")}
             </span>
           </div>
         </div>
@@ -195,47 +196,35 @@ export default function Login({ onLogin, error, businessProfile }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="w-full max-w-[500px] xl:max-w-[520px] bg-[#0c162b]/95 backdrop-blur-2xl border border-slate-700/70 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] rounded-3xl p-8 sm:p-11 text-white relative"
+            className="w-full max-w-md bg-[#0c162b]/95 backdrop-blur-2xl border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] rounded-3xl p-7 sm:p-8 text-white relative"
           >
             {/* Top Company Emblem / Logo */}
-            <div className="flex justify-center mb-6">
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-900/80 p-1 border border-cyan-500/40 shadow-xl shadow-cyan-500/25 overflow-hidden shrink-0">
-                    <img
-                      src={businessProfile?.companyLogo || "/logo.svg"}
-                      alt="Logo"
-                      className="w-full h-full object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <span className="text-3xl font-black uppercase tracking-tight text-white leading-none">
-                    AUTO<span className="text-[#00b4d8]">360</span>
-                  </span>
-                </div>
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mt-2">
-                  Auto Consultancy ERP
-                </span>
-              </div>
+            <div className="flex justify-center mb-5">
+              <img
+                src={businessProfile?.companyLogo || "/logo.png"}
+                alt={businessProfile?.companyName || "Logo"}
+                className="h-14 sm:h-16 w-auto max-w-[180px] object-contain drop-shadow-md rounded-lg"
+                onError={(e) => { e.currentTarget.src = "/logo.svg"; }}
+              />
             </div>
 
             {/* Welcome Greeting */}
-            <h3 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight text-center">
+            <h2 className="text-2xl font-black text-white leading-tight uppercase tracking-tight text-center">
               WELCOME BACK
-            </h3>
-            <p className="text-sm text-slate-400 text-center mt-1.5 mb-7">
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 font-medium tracking-wide text-center mb-6">
               Sign in to continue to your dashboard
             </p>
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4 text-left">
               <AnimatePresence>
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-3.5 bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs sm:text-sm font-semibold rounded-xl"
+                    className="p-3.5 bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs font-semibold rounded-xl"
                   >
                     {error}
                   </motion.div>
@@ -243,85 +232,134 @@ export default function Login({ onLogin, error, businessProfile }) {
               </AnimatePresence>
 
               {/* USERNAME / EMAIL ADDRESS */}
-              <div className="space-y-2 text-left">
-                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
-                  USERNAME / EMAIL ADDRESS
-                </label>
-                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
-                  <Mail size={18} className="text-slate-500 mr-3 shrink-0" />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest block">
+                    USERNAME / EMAIL ADDRESS
+                  </label>
+                  {email && (
+                    <button
+                      type="button"
+                      onClick={() => setEmail("")}
+                      className="text-[10px] font-bold text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-0.5 cursor-pointer"
+                      title="Clear username"
+                    >
+                      <X size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4 py-3 relative transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
+                  <Mail size={16} className="text-slate-500 mr-2.5 shrink-0" />
                   <input
                     type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin"
-                    className="w-full bg-transparent text-slate-900 font-bold text-sm sm:text-base outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-slate-900 font-bold text-sm outline-none placeholder:text-slate-400"
                   />
+                  {email && (
+                    <button
+                      type="button"
+                      onClick={() => setEmail("")}
+                      className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-200 transition-colors cursor-pointer ml-1.5"
+                      title="Clear username"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
 
               {/* PASSWORD */}
-              <div className="space-y-2 text-left">
-                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
-                  PASSWORD
-                </label>
-                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
-                  <Lock size={18} className="text-slate-500 mr-3 shrink-0" />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest block">
+                    PASSWORD
+                  </label>
+                  {password && (
+                    <button
+                      type="button"
+                      onClick={() => setPassword("")}
+                      className="text-[10px] font-bold text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-0.5 cursor-pointer"
+                      title="Clear password"
+                    >
+                      <X size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+                <div className="bg-[#edf2f7] rounded-xl flex items-center px-4 py-3 relative transition-all focus-within:ring-2 focus-within:ring-cyan-500 shadow-inner">
+                  <Lock size={16} className="text-slate-500 mr-2.5 shrink-0" />
                   <input
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-transparent text-slate-900 font-bold text-sm sm:text-base outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-slate-900 font-bold text-sm outline-none placeholder:text-slate-400"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-slate-500 hover:text-slate-700 cursor-pointer ml-2 outline-none"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                  <div className="flex items-center gap-1.5 ml-1.5">
+                    {password && (
+                      <button
+                        type="button"
+                        onClick={() => setPassword("")}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-200 transition-colors cursor-pointer"
+                        title="Clear password"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer outline-none"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* ASSIGNED BRANCH */}
-              <div className="space-y-2 text-left">
-                <label className="text-[11px] font-extrabold text-slate-300 uppercase tracking-wider block">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest block px-1">
                   ASSIGNED BRANCH
                 </label>
-                <div className="bg-[#070e20] border border-slate-700/90 rounded-xl flex items-center px-4.5 py-3.5 sm:py-4 relative shadow-inner">
-                  <MapPin size={18} className="text-slate-400 mr-3 shrink-0" />
+                <div className="bg-[#070e20] border border-slate-700/80 rounded-xl flex items-center px-4 py-3 relative shadow-inner focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400/20">
+                  <MapPin size={16} className="text-slate-400 mr-2.5 shrink-0" />
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full bg-transparent text-white font-bold text-sm sm:text-base outline-none appearance-none cursor-pointer pr-6"
+                    className="w-full bg-transparent text-white font-semibold text-sm outline-none appearance-none cursor-pointer pr-6"
                   >
                     {branches.map((b) => (
-                      <option key={b.id || b.name} value={b.name} className="bg-[#0b1329] text-white">
+                      <option key={b.id || b.name} value={b.name} className="bg-slate-900 text-white">
                         {b.name}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={16} className="text-slate-400 absolute right-4 pointer-events-none" />
+                  <ChevronDown size={14} className="text-slate-400 absolute right-4 pointer-events-none" />
                 </div>
               </div>
 
               {/* Remember Me & Change Password */}
-              <div className="flex items-center justify-between text-xs sm:text-sm pt-1.5">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <div className="flex items-center justify-between text-xs pt-1 pb-1">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none group">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4.5 h-4.5 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-blue-500 cursor-pointer"
                   />
-                  <span className="text-slate-300 font-semibold">Remember Me</span>
+                  <span className="text-slate-300 font-semibold group-hover:text-white transition-colors">
+                    Remember Me
+                  </span>
                 </label>
                 <button
                   type="button"
                   onClick={handleOpenChangePassword}
-                  className="text-cyan-400 hover:text-cyan-300 font-extrabold transition-colors cursor-pointer outline-none"
+                  className="text-cyan-400 hover:text-cyan-300 font-bold text-xs transition-colors cursor-pointer outline-none"
                 >
                   Change Password?
                 </button>
@@ -331,11 +369,11 @@ export default function Login({ onLogin, error, businessProfile }) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-4 mt-3 bg-gradient-to-r from-[#0066ff] to-[#00b4d8] text-white font-black text-sm sm:text-base tracking-wider uppercase rounded-xl flex items-center justify-center gap-2 hover:opacity-95 shadow-xl shadow-cyan-500/30 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
+                className="w-full py-3.5 mt-2 bg-gradient-to-r from-[#0066ff] to-[#00b4d8] text-white font-black text-sm tracking-wider uppercase rounded-xl flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-cyan-500/25 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60"
               >
                 {isLoading ? (
                   <>
-                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
@@ -344,7 +382,7 @@ export default function Login({ onLogin, error, businessProfile }) {
                 ) : (
                   <>
                     <span>SIGN IN TO PLATFORM</span>
-                    <ArrowRight size={18} />
+                    <ArrowRight size={16} />
                   </>
                 )}
               </button>
