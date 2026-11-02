@@ -1412,9 +1412,7 @@ export default function App() {
         { id: "ledger", label: "Ledger Master", view: "accounts", path: "/accounts", state: { accountsTab: "ledger" } },
         { id: "voucher", label: "Voucher Entry", view: "accounts", path: "/accounts", state: { accountsTab: "voucher" } },
         { id: "daybook", label: "Day Book", view: "accounts", path: "/accounts", state: { accountsTab: "daybook" } },
-        { id: "trial", label: "Trial Balance", view: "accounts", path: "/accounts", state: { accountsTab: "trial" } },
-        { id: "pl", label: "Profit & Loss", view: "accounts", path: "/accounts", state: { accountsTab: "pl" } },
-        { id: "balance", label: "Balance Sheet", view: "accounts", path: "/accounts", state: { accountsTab: "balance" } }
+        { id: "trial", label: "Trial Balance", view: "accounts", path: "/accounts", state: { accountsTab: "trial" } }
       ]
     },
     {
@@ -1422,8 +1420,6 @@ export default function App() {
       label: "Reports",
       icon: BarChart3,
       subItems: [
-        { id: "profit_loss", label: "Profit and Loss", view: "reports", path: "/reports/profit-loss", state: { reportType: "profit_loss" } },
-        { id: "balance_sheet", label: "Balance Sheet", view: "reports", path: "/reports/balance-sheet", state: { reportType: "balance_sheet" } },
         { id: "sales", label: "Sales Report", view: "reports", path: "/reports", state: { reportType: "sales" } },
         { id: "purchase", label: "Purchase Report", view: "reports", path: "/reports", state: { reportType: "purchase" } },
         { id: "customer_outstanding", label: "Customer Outstanding", view: "reports", path: "/reports", state: { reportType: "customer_outstanding" } },
@@ -1532,13 +1528,7 @@ export default function App() {
     } else if (path === "/accounts") {
       setSafeActiveView("accounts");
     } else if (path === "/reports" || path.startsWith("/reports/")) {
-      if (path === "/reports/profit-loss") {
-        setSafeActiveView("reports", { reportType: "profit_loss" });
-      } else if (path === "/reports/balance-sheet") {
-        setSafeActiveView("reports", { reportType: "balance_sheet" });
-      } else {
-        setSafeActiveView("reports");
-      }
+      setSafeActiveView("reports", { reportType: "sales" });
     } else if (path === "/staff-users" || path === "/users") {
       setSafeActiveView("users");
     } else if (path === "/settings") {

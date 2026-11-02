@@ -440,9 +440,7 @@ export default function Accounts({
     { id: "bankbook", label: "Bank Book", icon: Wallet },
     { id: "voucher", label: "Voucher Entry", icon: Plus },
     { id: "daybook", label: "Day Book", icon: Calendar },
-    { id: "trial", label: "Trial Balance", icon: BarChart3 },
-    { id: "pl", label: "Profit & Loss", icon: PieChart },
-    { id: "balance", label: "Balance Sheet", icon: Wallet }
+    { id: "trial", label: "Trial Balance", icon: BarChart3 }
   ];
   return <div className="space-y-6">
       {
@@ -642,8 +640,6 @@ export default function Accounts({
           />
         )}
         {activeTab === "trial" && <TrialBalance ledgers={ledgers} entries={entries} />}
-        {activeTab === "pl" && <ProfitLoss ledgers={ledgers} entries={entries} />}
-        {activeTab === "balance" && <BalanceSheet ledgers={ledgers} entries={entries} vehicles={vehicles} />}
       </div>
 
       {

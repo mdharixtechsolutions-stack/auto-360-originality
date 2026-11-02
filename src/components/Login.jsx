@@ -199,30 +199,24 @@ export default function Login({ onLogin, error, businessProfile }) {
           >
             {/* Top Company Emblem / Logo */}
             <div className="flex justify-center mb-5">
-              {businessProfile?.companyLogo ? (
-                <img
-                  src={businessProfile.companyLogo}
-                  alt="Company Logo"
-                  className="h-10 sm:h-12 object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 p-[1.5px] shadow-lg shadow-cyan-500/30">
-                      <div className="w-full h-full bg-[#070e20] rounded-[10px] flex items-center justify-center">
-                        <Car size={18} className="text-cyan-400" />
-                      </div>
-                    </div>
-                    <span className="text-2xl font-black uppercase tracking-tight text-white leading-none">
-                      AUTO<span className="text-[#00b4d8]">360</span>
-                    </span>
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-slate-900/60 p-0.5 border border-cyan-500/30 shadow-lg shadow-cyan-500/20 overflow-hidden shrink-0">
+                    <img
+                      src={businessProfile?.companyLogo || "/logo.svg"}
+                      alt="Logo"
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                    Auto Consultancy ERP
+                  <span className="text-2xl font-black uppercase tracking-tight text-white leading-none">
+                    AUTO<span className="text-[#00b4d8]">360</span>
                   </span>
                 </div>
-              )}
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                  Auto Consultancy ERP
+                </span>
+              </div>
             </div>
 
             {/* Welcome Greeting */}

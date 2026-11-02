@@ -50,7 +50,12 @@ export default function Reports({
   currentUser,
   selectedBranch = "all"
 }) {
-  const [activeReport, setActiveReport] = useState(initialReport || "sales");
+  const [activeReport, setActiveReport] = useState(() => {
+    if (initialReport && initialReport !== "profit_loss" && initialReport !== "balance_sheet") {
+      return initialReport;
+    }
+    return "sales";
+  });
   const [reportStatus, setReportStatus] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("custom");
 
@@ -181,7 +186,7 @@ export default function Reports({
   const [loginReports, setLoginReports] = useState([]);
 
   useEffect(() => {
-    if (initialReport) {
+    if (initialReport && initialReport !== "profit_loss" && initialReport !== "balance_sheet") {
       setActiveReport(initialReport);
     }
   }, [initialReport]);
@@ -234,15 +239,13 @@ export default function Reports({
     }
   }, [activeReport]);
   const reportOptions = [
-    { id: "profit_loss", label: "Profit and Loss", icon: TrendingUp, color: "text-emerald-700 font-extrabold", bg: "bg-emerald-50" },
-    { id: "balance_sheet", label: "Balance Sheet", icon: FileText, color: "text-blue-700 font-extrabold", bg: "bg-blue-50" },
+    { id: "sales", label: "Sales Report", icon: TrendingUp, color: "text-emerald-600 font-extrabold", bg: "bg-emerald-50" },
+    { id: "purchase", label: "Purchase Report", icon: Car, color: "text-blue-600 font-extrabold", bg: "bg-blue-50" },
     { id: "customer_purchase_outstanding", label: "Customer Purchase Outstanding Report", icon: Clock, color: "text-amber-600 font-extrabold", bg: "bg-amber-50" },
     { id: "customer_sales_outstanding", label: "Customer Sales Outstanding Report", icon: Clock, color: "text-emerald-600 font-extrabold", bg: "bg-emerald-50" },
     { id: "supplier_outstanding", label: "Supplier Outstanding Report", icon: Clock, color: "text-orange-600 font-extrabold", bg: "bg-orange-50" },
     { id: "finance_settlement", label: "Finance Settlement Report", icon: Building, color: "text-purple-600 font-extrabold", bg: "bg-purple-50" },
     { id: "consultancy_fees", label: "Consultancy Fees Report", icon: IndianRupee, color: "text-indigo-600 font-extrabold", bg: "bg-indigo-50" },
-    { id: "sales", label: "Sales Report", icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { id: "purchase", label: "Purchase Report", icon: Car, color: "text-blue-600", bg: "bg-blue-50" },
     { id: "customer", label: "Customer Report", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
     { id: "expense", label: "Expense Report", icon: IndianRupee, color: "text-rose-600", bg: "bg-rose-50" },
     { id: "inventory", label: "Inventory Report", icon: FileText, color: "text-amber-600", bg: "bg-amber-50" },
@@ -264,14 +267,13 @@ export default function Reports({
     if (role === "Super Admin" || role === "Admin" || role === "Branch Admin") return true;
     if (role === "Manager") {
       return [
-        "profit_loss",
-        "balance_sheet",
+        "sales",
+        "purchase",
         "customer_purchase_outstanding",
         "customer_sales_outstanding",
         "supplier_outstanding",
         "finance_settlement",
-        "sales",
-        "purchase",
+        "consultancy_fees",
         "customer",
         "expense",
         "inventory",
@@ -283,7 +285,7 @@ export default function Reports({
       ].includes(opt.id);
     }
     if (role === "Staff" || role === "Sales") {
-      return ["profit_loss", "balance_sheet", "customer_purchase_outstanding", "customer_sales_outstanding", "supplier_outstanding", "finance_settlement", "sales", "customer", "inventory"].includes(opt.id);
+      return ["sales", "purchase", "customer_purchase_outstanding", "customer_sales_outstanding", "supplier_outstanding", "finance_settlement", "customer", "inventory"].includes(opt.id);
     }
     return false;
   });
