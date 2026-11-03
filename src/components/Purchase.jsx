@@ -3696,13 +3696,16 @@ export default function PurchasesListAndForm({
   }
       <AnimatePresence>
         {successToast && <motion.div
-    initial={{ opacity: 0, y: 50, scale: 0.9 }}
+    initial={{ opacity: 0, y: -40, scale: 0.95 }}
     animate={{ opacity: 1, y: 0, scale: 1 }}
-    exit={{ opacity: 0, y: 20, scale: 0.9 }}
-    className="fixed bottom-6 right-6 z-[100] bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 font-semibold text-sm"
+    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+    className="fixed top-[calc(max(env(safe-area-inset-top,0px),0px)+16px)] left-1/2 -translate-x-1/2 z-[99999] w-[92vw] max-w-md bg-emerald-600/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 font-semibold text-xs sm:text-sm border border-emerald-400/40"
   >
-            <CheckCircle2 size={18} />
-            {successToast}
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 size={18} className="text-white shrink-0" />
+              <span>{successToast}</span>
+            </div>
+            <button type="button" onClick={() => setSuccessToast(null)} className="text-emerald-200 hover:text-white p-1">✕</button>
           </motion.div>}
       </AnimatePresence>
 

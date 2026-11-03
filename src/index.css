@@ -103,3 +103,47 @@
 .sidebar-item-active {
   @apply bg-brand-50 text-brand-600 border-r-4 border-brand-600;
 }
+
+/* Safe Area Insets for Mobile App Notches, Status Bar & Home Gesture Bars */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+
+.safe-left {
+  padding-left: max(env(safe-area-inset-left, 0px), 0px);
+}
+
+.safe-right {
+  padding-right: max(env(safe-area-inset-right, 0px), 0px);
+}
+
+.safe-margin-top {
+  margin-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+.safe-margin-bottom {
+  margin-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+
+/* Mobile Bottom Navigation Bar Safe Padding */
+.mobile-nav-safe {
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 0px) + 0.35rem);
+}
+
+/* Prevent unwanted callouts and highlights on mobile touch */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

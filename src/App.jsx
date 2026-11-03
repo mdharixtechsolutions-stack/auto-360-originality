@@ -51,7 +51,8 @@ const LOGO_URL = "/logo.svg";
 
 // Auto-prefix backend when running in mobile Capacitor or standalone mode
 if (typeof window !== "undefined") {
-  const isCapacitorOrLocal = window.location.origin.includes("capacitor") || 
+  const isCapacitorOrLocal = !!window.Capacitor || 
+    window.location.origin.includes("capacitor") || 
     (window.location.hostname === "localhost" && window.location.port !== "3003" && window.location.port !== "3016");
   if (isCapacitorOrLocal && axios) {
     axios.defaults.baseURL = "https://auto360.harixtechsolutions.com";
@@ -70,7 +71,8 @@ try {
         requestUrl = url.url;
       }
       
-      const isCapacitorOrLocal = window.location.origin.includes("capacitor") || 
+      const isCapacitorOrLocal = !!window.Capacitor || 
+        window.location.origin.includes("capacitor") || 
         (window.location.hostname === "localhost" && window.location.port !== "3003" && window.location.port !== "3016");
       if (isCapacitorOrLocal && requestUrl.startsWith("/")) {
         requestUrl = "https://auto360.harixtechsolutions.com" + requestUrl;
@@ -426,6 +428,36 @@ export default function App() {
   const [licenseInfo, setLicenseInfo] = useState({ status: "Active", licenseKey: "" });
   const [adminAuthCode, setAdminAuthCode] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
+
+  // Global Safe-Area Toast System
+  const [globalToast, setGlobalToast] = useState(null);
+
+  useEffect(() => {
+    const handleToastEvent = (e) => {
+      if (e.detail) {
+        setGlobalToast({
+          message: typeof e.detail === "string" ? e.detail : e.detail.message,
+          type: e.detail.type || "success"
+        });
+      }
+    };
+    window.addEventListener("app:toast", handleToastEvent);
+    window.showToast = (message, type = "success") => {
+      setGlobalToast({ message, type });
+    };
+    return () => {
+      window.removeEventListener("app:toast", handleToastEvent);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (globalToast) {
+      const timer = setTimeout(() => {
+        setGlobalToast(null);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [globalToast]);
 
   // Verify Session Token on App Load in background without dropping active session on reload or network hiccups
   useEffect(() => {
@@ -1826,7 +1858,7 @@ export default function App() {
         />;
     }
   };
-  return <div key={language} className="h-screen w-screen flex bg-slate-50 relative overflow-hidden">
+  return <div key={language} className="h-[100dvh] w-full flex bg-slate-50 relative overflow-hidden safe-top safe-bottom">
       {
     /* Mobile Blur Backdrop overlay */
   }
@@ -1851,7 +1883,7 @@ export default function App() {
     transition={{ type: "spring", damping: 26, stiffness: 220 }}
     className={cn(
       "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 flex flex-col overflow-hidden",
-      isMobile ? "w-[280px] shadow-2xl" : "relative"
+      isMobile ? "w-[280px] shadow-2xl safe-top safe-bottom" : "relative"
     )}
   >
             <div className="p-6 flex items-center gap-3 animate-fade-in">
@@ -2058,12 +2090,12 @@ export default function App() {
       {
     /* Main Content */
   }
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden">
         {
     /* Header */
   }
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
-          <div className="flex items-center gap-4">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-4 lg:px-8 sticky top-0 z-40 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-xl transition-all cursor-pointer outline-none"
@@ -2071,7 +2103,7 @@ export default function App() {
             >
               <Menu size={20} />
             </button>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 sm:gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                 <img 
                   src={businessProfile.companyLogo || LOGO_URL} 
@@ -2095,7 +2127,8 @@ export default function App() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-4">
+            {/* Desktop Global Search Input */}
             <div className="hidden md:flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200 focus-within:border-brand-500 focus-within:bg-white transition-all shadow-sm">
               <Search size={16} className={`${isSearchingGlobal ? "text-brand-500 animate-spin" : "text-slate-500"}`} />
               <input
@@ -2119,6 +2152,22 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {/* Mobile Global Search Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowGlobalSearchResults(true);
+                if (!globalSearchResults) {
+                  setGlobalSearchResults({ customers: [], purchases: [], sales: [], loans: [], suppliers: [] });
+                }
+              }}
+              className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              title="Search records"
+            >
+              <Search size={19} />
+            </button>
+
             <button
               type="button"
               onClick={() => setShowNotifications((prev) => !prev)}
@@ -2128,8 +2177,8 @@ export default function App() {
               <Bell size={20} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
             </button>
-            <div className="h-8 w-px bg-slate-200 mx-1" />
-            <div className="flex items-center gap-2">
+            <div className="h-8 w-px bg-slate-200 mx-1 hidden xs:block" />
+            <div className="items-center gap-2 hidden sm:flex">
               <div className="text-right sm:block">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1 text-left sm:text-right">Active Branch</p>
                 <p className="text-xs font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{currentUser?.branch || "Tiruppur"}</p>
@@ -2139,7 +2188,7 @@ export default function App() {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-8 pb-28 md:pb-8">
           {showNotifications && (
             <div className="mb-6 p-6 bg-white border border-slate-200 rounded-2xl shadow-xl space-y-4 text-left">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2699,6 +2748,140 @@ export default function App() {
         </AnimatePresence>
         {/* Global Secret Admin Auth Modal */}
         {showSecretAdminAuthModal && renderSecretAdminAuthModal()}
+
+        {/* MOBILE BOTTOM NAVIGATION BAR */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] mobile-nav-safe">
+          <div className="grid grid-cols-5 h-14">
+            <button
+              type="button"
+              onClick={() => {
+                handleNavigate("dashboard");
+                setIsSidebarOpen(false);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 transition-all text-[10px] font-bold cursor-pointer",
+                activeView === "dashboard"
+                  ? "text-brand-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <div className={cn("p-1 rounded-xl transition-all", activeView === "dashboard" && "bg-brand-50 text-brand-600")}>
+                <LayoutDashboard size={20} />
+              </div>
+              <span className="leading-none">Dashboard</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleNavigate("purchase");
+                setIsSidebarOpen(false);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 transition-all text-[10px] font-bold cursor-pointer",
+                activeView === "purchase"
+                  ? "text-brand-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <div className={cn("p-1 rounded-xl transition-all", activeView === "purchase" && "bg-brand-50 text-brand-600")}>
+                <Car size={20} />
+              </div>
+              <span className="leading-none">Vehicles</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleNavigate("customers");
+                setIsSidebarOpen(false);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 transition-all text-[10px] font-bold cursor-pointer",
+                activeView === "customers"
+                  ? "text-brand-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <div className={cn("p-1 rounded-xl transition-all", activeView === "customers" && "bg-brand-50 text-brand-600")}>
+                <Users size={20} />
+              </div>
+              <span className="leading-none">Customers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleNavigate("sales");
+                setIsSidebarOpen(false);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 transition-all text-[10px] font-bold cursor-pointer",
+                activeView === "sales"
+                  ? "text-brand-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <div className={cn("p-1 rounded-xl transition-all", activeView === "sales" && "bg-brand-50 text-brand-600")}>
+                <Handshake size={20} />
+              </div>
+              <span className="leading-none">Sales</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 transition-all text-[10px] font-bold cursor-pointer",
+                isSidebarOpen
+                  ? "text-brand-600 font-extrabold"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <div className={cn("p-1 rounded-xl transition-all", isSidebarOpen && "bg-brand-50 text-brand-600")}>
+                <Menu size={20} />
+              </div>
+              <span className="leading-none">Menu</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* Global Safe-Area Toast Notification */}
+        <AnimatePresence>
+          {globalToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="fixed top-[calc(max(env(safe-area-inset-top,0px),0px)+12px)] left-1/2 -translate-x-1/2 z-[99999] w-[92vw] max-w-md pointer-events-auto"
+            >
+              <div className={cn(
+                "px-4 py-3 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm font-semibold backdrop-blur-md",
+                globalToast.type === "error"
+                  ? "bg-rose-950/95 text-rose-100 border-rose-500/40 shadow-rose-500/20"
+                  : globalToast.type === "info"
+                  ? "bg-sky-950/95 text-sky-100 border-sky-500/40 shadow-sky-500/20"
+                  : "bg-slate-900/95 text-white border-slate-700/80 shadow-slate-950/50"
+              )}>
+                <div className="flex items-center gap-2.5">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full shrink-0",
+                    globalToast.type === "error" ? "bg-rose-400 animate-ping" : "bg-emerald-400 animate-pulse"
+                  )} />
+                  <span className="line-clamp-2">{globalToast.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGlobalToast(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>;
 }

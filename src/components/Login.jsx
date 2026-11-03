@@ -133,7 +133,7 @@ export default function Login({ onLogin, error, businessProfile }) {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between overflow-x-hidden bg-[#070b14] text-slate-100 font-sans select-none">
+    <div className="relative min-h-[100dvh] w-full flex flex-col justify-between overflow-x-hidden bg-[#070b14] text-slate-100 font-sans select-none safe-top safe-bottom">
       {/* Full Background Showroom Image */}
       <img
         src={showroomBg}
@@ -185,7 +185,7 @@ export default function Login({ onLogin, error, businessProfile }) {
           {/* Pill Badge */}
           <div className="pt-1">
             <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#0a1838]/80 border border-blue-500/50 backdrop-blur-md text-xs font-bold tracking-widest text-cyan-300 uppercase shadow-md">
-              {(businessProfile?.companyName && businessProfile.companyName !== "Auto 360" ? businessProfile.companyName : "KOVAI MOTOBIKES")}
+              {businessProfile?.companyName || "AUTO 360"}
             </span>
           </div>
         </div>
@@ -201,8 +201,8 @@ export default function Login({ onLogin, error, businessProfile }) {
             {/* Top Company Emblem / Logo */}
             <div className="flex justify-center mb-5">
               <img
-                src={businessProfile?.companyLogo || "/logo.png"}
-                alt={businessProfile?.companyName || "Logo"}
+                src={businessProfile?.companyLogo || "/logo.svg"}
+                alt={businessProfile?.companyName || "Auto 360"}
                 className="h-14 sm:h-16 w-auto max-w-[180px] object-contain drop-shadow-md rounded-lg"
                 onError={(e) => { e.currentTarget.src = "/logo.svg"; }}
               />

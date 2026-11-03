@@ -43,10 +43,13 @@ export default function Settings({ initialTab, currentUser, businessProfile, set
       {
     /* Toast Notification */
   }
-      {toast && <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl z-50 flex items-center gap-2 border border-slate-700 text-xs font-bold animate-slide-up">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          {toast}
-         </div>}
+      {toast && <div className="fixed top-[calc(max(env(safe-area-inset-top,0px),0px)+16px)] left-1/2 -translate-x-1/2 z-[99999] w-[92vw] max-w-md bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border border-slate-700 text-xs sm:text-sm font-semibold animate-slide-down">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span>{toast}</span>
+          </div>
+          <button type="button" onClick={() => setToast(null)} className="text-slate-400 hover:text-white p-1">✕</button>
+        </div>}
 
       {
     /* Header */
