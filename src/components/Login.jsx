@@ -163,10 +163,10 @@ export default function Login({ onLogin, error, businessProfile }) {
       </header>
 
       {/* MAIN VIEWPORT BODY: Left Branding & Right Login Card */}
-      <main className="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-between px-6 sm:px-12 lg:px-20 xl:px-28 py-8 w-full max-w-[1440px] mx-auto">
+      <main className="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-center lg:justify-between px-4 sm:px-12 lg:px-20 xl:px-28 py-4 sm:py-8 w-full max-w-[1440px] mx-auto">
         
-        {/* LEFT SIDE: Hero Branding */}
-        <div className="w-full lg:w-1/2 space-y-4 mb-10 lg:mb-0 text-left">
+        {/* LEFT SIDE: Hero Branding (Desktop Only) */}
+        <div className="hidden lg:block w-full lg:w-1/2 space-y-4 mb-10 lg:mb-0 text-left">
           {/* Car Icon + AUTO 360 */}
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-[#07132e]/90 border-2 border-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.55)] flex items-center justify-center shrink-0">

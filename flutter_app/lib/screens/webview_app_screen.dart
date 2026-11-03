@@ -108,15 +108,9 @@ class _WebviewAppScreenState extends State<WebviewAppScreen> {
     await _controller.reload();
   }
 
-  Future<void> _goToHome() async {
-    HapticFeedback.lightImpact();
-    await _controller.loadRequest(Uri.parse(_appUrl));
-  }
-
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return PopScope(
       canPop: false,
@@ -146,17 +140,17 @@ class _WebviewAppScreenState extends State<WebviewAppScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         body: Container(
-          padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+          padding: EdgeInsets.only(top: topPadding),
           color: const Color(0xFFF8FAFC),
           child: Stack(
             children: [
-              // Main WebView
+              // Main WebView - Full width edge-to-edge
               if (!_hasError)
                 WebViewWidget(controller: _controller)
               else
                 _buildErrorView(),
 
-              // Loading Progress Bar at top
+              // Sleek Loading Progress Bar at top
               if (_isLoading && !_hasError)
                 Positioned(
                   top: 0,
@@ -166,47 +160,9 @@ class _WebviewAppScreenState extends State<WebviewAppScreen> {
                     value: _loadingProgress > 0 ? _loadingProgress : null,
                     backgroundColor: Colors.transparent,
                     valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
-                    minHeight: 3,
+                    minHeight: 2.5,
                   ),
                 ),
-
-              // Floating Controls (Quick Refresh & Home)
-              Positioned(
-                right: 14,
-                bottom: 14,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton.small(
-                      heroTag: 'fab_home',
-                      elevation: 3,
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(color: AppTheme.cardBorder, width: 1),
-                      ),
-                      onPressed: _goToHome,
-                      tooltip: 'Dashboard Home',
-                      child: const Icon(Icons.home_rounded, size: 20),
-                    ),
-                    const SizedBox(width: 8),
-                    FloatingActionButton.small(
-                      heroTag: 'fab_refresh',
-                      elevation: 3,
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(color: AppTheme.cardBorder, width: 1),
-                      ),
-                      onPressed: _handleRefresh,
-                      tooltip: 'Reload Page',
-                      child: const Icon(Icons.refresh_rounded, size: 20),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
