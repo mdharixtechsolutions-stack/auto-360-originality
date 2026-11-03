@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import 'login_screen.dart';
-import 'main_navigation_screen.dart';
+import 'webview_app_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,12 +44,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _checkAuth() async {
     final startTime = DateTime.now();
-    final isLoggedIn = await ApiService().init();
 
-    // Ensure splash is visible for at least 1.2s for pleasant brand feel
+    // Ensure splash is visible for at least 1.0s for pleasant brand feel
     final elapsed = DateTime.now().difference(startTime);
-    if (elapsed < const Duration(milliseconds: 1200)) {
-      await Future.delayed(const Duration(milliseconds: 1200) - elapsed);
+    if (elapsed < const Duration(milliseconds: 1000)) {
+      await Future.delayed(const Duration(milliseconds: 1000) - elapsed);
     }
 
     if (!mounted) return;
@@ -59,8 +56,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            isLoggedIn ? const MainNavigationScreen() : const LoginScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => const WebviewAppScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
