@@ -1549,7 +1549,7 @@ app.get("/api/purchases/nextId", (req, res) => {
 });
 app.get("/api/customers/fetch/:id", (req, res) => {
   const db = readDb();
-  const customer = db.customers.find((c) => c.customer_id === req.params.id);
+  const customer = db.customers.find((c) => c.customer_id === req.params.id || c.id === req.params.id);
   if (!customer) {
     return res.status(404).json({ error: "Customer not found" });
   }
@@ -1557,7 +1557,7 @@ app.get("/api/customers/fetch/:id", (req, res) => {
 });
 app.get("/api/suppliers/fetch/:id", (req, res) => {
   const db = readDb();
-  const supplier = db.suppliers.find((s) => s.supplier_id === req.params.id);
+  const supplier = db.suppliers.find((s) => s.supplier_id === req.params.id || s.id === req.params.id);
   if (!supplier) {
     return res.status(404).json({ error: "Supplier not found" });
   }
@@ -1606,8 +1606,22 @@ app.get("/api/purchases", (req, res) => {
   const branch = req.query.branch;
   if (branch && branch !== "all") {
     const cleanB = branch.toLowerCase().replace(/branch/gi, "").trim();
-    filtered = filtered.filter((p) => (p.branch || "").toLowerCase().includes(cleanB));
+    filtered = filtered.filter((p) => {
+      const pBranch = (p.branch || "").toLowerCase().replace(/branch/gi, "").trim();
+      return pBranch.includes(cleanB) || pBranch === "all" || !pBranch;
+    });
   }
+
+  // Sort descending by date/ID so newly added purchases are immediately visible on Page 1
+  filtered.sort((a, b) => {
+    const dateA = new Date(a.purchase_date || a.created_at || 0).getTime();
+    const dateB = new Date(b.purchase_date || b.created_at || 0).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+    const numA = parseInt((a.purchase_id || "").replace(/\D/g, "")) || 0;
+    const numB = parseInt((b.purchase_id || "").replace(/\D/g, "")) || 0;
+    return numB - numA;
+  });
+
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const startIndex = (page - 1) * limit;
@@ -1785,12 +1799,12 @@ app.post("/api/purchases", (req, res) => {
     sold_aadhaar_number: sold_aadhaar_number || "",
     sold_pan_number: sold_pan_number || "",
     sold_status: sold_status || "Pending",
-    branch: req.body.branch || req.headers["x-user-branch"] || "Coimbatore"
+    branch: req.body.branch || req.headers["x-user-branch"] || "Tiruppur"
   };
   if (!db.purchases) {
     db.purchases = [];
   }
-  db.purchases.push(newPurchase);
+  db.purchases.unshift(newPurchase);
 
   // AUTOMATED ACCOUNTING ENTRY: Create a purchase voucher for the advance payment amount
   if (!db.vouchers) db.vouchers = [];
@@ -1965,7 +1979,8 @@ app.put("/api/purchases/:id", (req, res) => {
     sold_consultancy_fees: sold_consultancy_fees !== void 0 ? Number(sold_consultancy_fees) : existing.sold_consultancy_fees,
     sold_aadhaar_number: sold_aadhaar_number !== void 0 ? sold_aadhaar_number : existing.sold_aadhaar_number,
     sold_pan_number: sold_pan_number !== void 0 ? sold_pan_number : existing.sold_pan_number,
-    sold_status: sold_status !== void 0 ? sold_status : existing.sold_status
+    sold_status: sold_status !== void 0 ? sold_status : existing.sold_status,
+    branch: req.body.branch !== void 0 ? req.body.branch : (existing.branch || "Tiruppur")
   };
   db.purchases[index] = updated;
 

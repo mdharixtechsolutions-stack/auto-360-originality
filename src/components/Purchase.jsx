@@ -90,6 +90,8 @@ export default function PurchasesListAndForm({
   areas,
   subAreas,
   customers,
+  allCustomers = [],
+  branches = [],
   suppliers,
   onUpdateDeals,
   onUpdateCustomers,
@@ -271,6 +273,7 @@ export default function PurchasesListAndForm({
     purchase_id: "",
     purchase_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
     purchase_type: "Customer",
+    branch: (selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur",
     seller_id: "",
     seller_name: "",
     seller_mobile: "",
@@ -322,6 +325,10 @@ export default function PurchasesListAndForm({
     payment_mode: "Cash",
     status: "Available"
   });
+  const availableCustomers = useMemo(() => {
+    const list = customers && customers.length > 0 ? customers : (allCustomers && allCustomers.length > 0 ? allCustomers : []);
+    return list.filter((c) => !c.isDeleted);
+  }, [customers, allCustomers]);
   const availableBrands = useMemo(() => {
     return (brands || []).filter((b) => !b.isDeleted);
   }, [brands]);
@@ -518,22 +525,36 @@ export default function PurchasesListAndForm({
   };
 
   const handleQuickAddCustomer = async () => {
-    if (!newCustomerName.trim() || !newCustomerMobile.trim()) {
-      alert("Please enter Customer Name and Mobile Number");
+    const trimmedName = newCustomerName.trim();
+    const cleanMobile = newCustomerMobile.trim().replace(/\D/g, "");
+    if (!trimmedName) {
+      alert("Please enter Customer Full Name");
+      return;
+    }
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      alert("Please enter a valid 10-digit Mobile Number");
       return;
     }
     try {
+      const targetBranch = formState.branch || (selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur";
+      const matchedCity = cities.find((c) => c.id === newCustomerCity || c.name === newCustomerCity);
+      const cityIdVal = matchedCity ? matchedCity.id : (newCustomerCity.trim() || "");
+
       const newCustPayload = {
-        name: newCustomerName.trim(),
-        mobile: newCustomerMobile.trim(),
-        city: newCustomerCity.trim() || "Coimbatore",
+        name: trimmedName,
+        customer_name: trimmedName,
+        mobile: cleanMobile,
+        customer_mobile: cleanMobile,
+        city_id: cityIdVal,
+        city: matchedCity ? matchedCity.name : newCustomerCity.trim(),
         area: newCustomerArea.trim(),
         subArea: newCustomerSubArea.trim(),
         address: newCustomerAddress.trim(),
         customer_type: "Sell",
         requirement: "Sell",
         status: "Direct Purchase Seller",
-        branch: currentUser?.branch || selectedBranch || "Coimbatore"
+        customer_status: "Active",
+        branch: targetBranch
       };
 
       const res = await fetch("/api/customers", {
@@ -544,20 +565,34 @@ export default function PurchasesListAndForm({
 
       if (res.ok) {
         const data = await res.json();
-        const saved = data.customer || { ...newCustPayload, id: data.id || `CUST-${Date.now()}` };
+        const saved = data.customer || data || { ...newCustPayload, id: `CUST-${Date.now()}` };
+        const savedId = saved.customer_id || saved.id;
+        const normalized = {
+          ...saved,
+          id: savedId,
+          customer_id: savedId,
+          name: saved.customer_name || saved.name || trimmedName,
+          customer_name: saved.customer_name || saved.name || trimmedName,
+          mobile: saved.customer_mobile || saved.mobile || cleanMobile,
+          customer_mobile: saved.customer_mobile || saved.mobile || cleanMobile,
+          address: saved.address || newCustomerAddress.trim(),
+          city_id: saved.city_id || cityIdVal,
+          branch: targetBranch
+        };
+
         if (onUpdateCustomers) {
-          onUpdateCustomers((prev) => [...prev, saved]);
+          onUpdateCustomers((prev) => [normalized, ...(prev || []).filter((c) => (c.id || c.customer_id) !== savedId)]);
         }
         if (onRefreshData) onRefreshData();
 
-        const savedId = saved.id || saved.customer_id;
         setFormState((prev) => ({
           ...prev,
           purchase_type: "Customer",
           seller_id: savedId,
-          seller_name: saved.name || saved.customer_name || newCustomerName.trim(),
-          seller_mobile: saved.mobile || saved.customer_mobile || newCustomerMobile.trim(),
-          seller_address: saved.address || newCustomerAddress.trim()
+          seller_name: normalized.name,
+          seller_mobile: normalized.mobile,
+          seller_city_id: normalized.city_id,
+          seller_address: normalized.address
         }));
 
         setCustomerFlow("existing");
@@ -567,13 +602,15 @@ export default function PurchasesListAndForm({
         setNewCustomerArea("");
         setNewCustomerSubArea("");
         setNewCustomerAddress("");
-        alert(`Customer "${saved.name || newCustomerName.trim()}" created successfully and selected as seller!`);
+        setSuccessToast(`Customer "${normalized.name}" added and linked to purchase!`);
+        setTimeout(() => setSuccessToast(null), 3000);
       } else {
-        alert("Failed to create customer. Please try again.");
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to create customer. Please try again.");
       }
     } catch (err) {
       console.error("[Quick Add Customer Error]", err);
-      alert("Error saving customer. Please try again.");
+      alert("Error saving customer due to network error.");
     }
   };
   const compressImage = (file, maxWidth = 1600, maxHeight = 1600, quality = 0.8) => {
@@ -854,6 +891,14 @@ export default function PurchasesListAndForm({
   const handleOpenAdd = async () => {
     setIsEditMode(false);
     setSelectedPurchase(null);
+    setCustomerFlow("existing");
+    setNewCustomerName("");
+    setNewCustomerMobile("");
+    setNewCustomerCity("");
+    setNewCustomerArea("");
+    setNewCustomerSubArea("");
+    setNewCustomerAddress("");
+    const defaultBranch = (selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur";
     let currentState = businessProfile?.defaultState || businessProfile?.state || "Tamil Nadu";
     try {
       const res = await fetch("/api/settings/general");
@@ -872,6 +917,7 @@ export default function PurchasesListAndForm({
       purchase_id: "",
       purchase_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
       purchase_type: "Customer",
+      branch: defaultBranch,
       seller_id: "",
       seller_name: "",
       seller_mobile: "",
@@ -1055,7 +1101,7 @@ export default function PurchasesListAndForm({
     e.preventDefault();
     if (isSaving) return;
     if (!formState.seller_id) {
-      alert("Please select a valid Customer/Supplier ID");
+      alert("Please select or add a Customer/Supplier for this vehicle purchase");
       return;
     }
     if (!formState.brand_id) {
@@ -1066,13 +1112,15 @@ export default function PurchasesListAndForm({
       alert("Please select vehicle name (model)");
       return;
     }
-    if (!formState.reg_no) {
+    if (!formState.reg_no || !formState.reg_no.trim()) {
       alert("Please enter a registration number");
       return;
     }
     const salesPriceVal = Number(formState.expected_selling_price) || 0;
+    const targetBranch = formState.branch || (selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur";
     const payload = {
       ...formState,
+      branch: targetBranch,
       balance_amount: balanceAmount,
       selling_price: salesPriceVal,
       expected_selling_price: salesPriceVal,
@@ -1095,14 +1143,16 @@ export default function PurchasesListAndForm({
         setShowAddEditModal(false);
         setSuccessToast(isEditMode ? "Purchase record updated successfully!" : "New purchase record created successfully!");
         setTimeout(() => setSuccessToast(null), 3e3);
-        fetchPurchases();
+        setPage(1);
+        await fetchPurchases();
+        if (onRefreshData) onRefreshData();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         alert("Error saving purchase: " + (err.error || "Unknown error"));
       }
     } catch (err) {
       console.error("Error saving purchase info", err);
-      alert("Failed to save purchase record due to dynamic communication error");
+      alert("Failed to save purchase record due to network error");
     } finally {
       setIsSaving(false);
     }
@@ -1368,7 +1418,11 @@ export default function PurchasesListAndForm({
     /* Numerical Quick Cards */
   }
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => { setStatusFilter("all"); setPage(1); }}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+          title="Click to view all stock"
+        >
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acquisition Assets</p>
             <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(totalStockValue) || 0).toLocaleString("en-IN")}</h3>
@@ -1378,7 +1432,11 @@ export default function PurchasesListAndForm({
           </div>
         </div>
         
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => { setStatusFilter("Available"); setPage(1); }}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:border-emerald-200 transition-all"
+          title="Click to filter by Available Stock"
+        >
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-emerald-600">Available Stock</p>
             <h3 className="text-xl font-extrabold text-slate-900 mt-1">
@@ -1390,7 +1448,11 @@ export default function PurchasesListAndForm({
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => { setStatusFilter("all"); setPage(1); }}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:border-amber-200 transition-all"
+          title="Click to view transactions"
+        >
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-amber-600">Outstanding Balance</p>
             <h3 className="text-xl font-extrabold text-slate-900 mt-1">₹{(Number(totalActiveBalance) || 0).toLocaleString("en-IN")}</h3>
@@ -1400,7 +1462,11 @@ export default function PurchasesListAndForm({
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => { setStatusFilter("all"); setTypeFilter("all"); setPage(1); }}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:border-rose-200 transition-all"
+          title="Click to reset filters"
+        >
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-rose-500">Transaction Actions</p>
             <h3 className="text-xl font-extrabold text-slate-900 mt-1">{totalCount} Total</h3>
@@ -1810,7 +1876,11 @@ export default function PurchasesListAndForm({
       /* 5. Payment Button */
     }
                       <button
-                        onClick={() => onNavigate && onNavigate("payments", { paymentsSubTab: p.sellerType === "Customer" ? "customer" : "supplier", partyId: p.sellerId || p.supplier_id, vehicleId: p.purchase_id || p.id })}
+                        onClick={() => onNavigate && onNavigate("payments", {
+                          paymentsSubTab: (p.purchase_type === "Customer" || p.sellerType === "Customer") ? "customer" : "supplier",
+                          partyId: p.seller_id || p.sellerId || p.supplier_id || p.id,
+                          vehicleId: p.purchase_id || p.id
+                        })}
                         className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                         title="Record Payment / Receipt for Purchase"
                       >
@@ -2385,9 +2455,9 @@ export default function PurchasesListAndForm({
                 <div className="p-6 overflow-y-auto space-y-6">
                   
                   {
-    /* Row 1: Purchase ID, Date, Sourcing Type */
+    /* Row 1: Purchase ID, Date, Branch Location, Sourcing Type */
   }
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Purchase ID</label>
                       <input
@@ -2401,33 +2471,52 @@ export default function PurchasesListAndForm({
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Purchase Date</label>
                       <input
-    type="date"
-    required
-    value={formState.purchase_date}
-    onChange={(e) => setFormState((prev) => ({ ...prev, purchase_date: e.target.value }))}
-    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 font-semibold text-sm"
-  />
+                        type="date"
+                        required
+                        value={formState.purchase_date}
+                        onChange={(e) => setFormState((prev) => ({ ...prev, purchase_date: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 font-semibold text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Branch Location</label>
+                      <select
+                        value={formState.branch || (selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur"}
+                        onChange={(e) => setFormState((prev) => ({ ...prev, branch: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
+                      >
+                        {branches && branches.length > 0 ? (
+                          branches.map((b) => (
+                            <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Tiruppur">Tiruppur Branch</option>
+                            <option value="Coimbatore">Coimbatore Branch</option>
+                          </>
+                        )}
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">Purchase Type Role</label>
                       <select
-    value={formState.purchase_type}
-    onChange={(e) => {
-      const typeVal = e.target.value;
-      setFormState((prev) => ({
-        ...prev,
-        purchase_type: typeVal,
-        seller_id: "",
-        seller_name: "",
-        seller_mobile: "",
-        seller_city_id: "",
-        seller_area_id: "",
-        seller_sub_area_id: "",
-        seller_address: ""
-      }));
-    }}
-    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
-  >
+                        value={formState.purchase_type}
+                        onChange={(e) => {
+                          const typeVal = e.target.value;
+                          setFormState((prev) => ({
+                            ...prev,
+                            purchase_type: typeVal,
+                            seller_id: "",
+                            seller_name: "",
+                            seller_mobile: "",
+                            seller_city_id: "",
+                            seller_area_id: "",
+                            seller_sub_area_id: "",
+                            seller_address: ""
+                          }));
+                        }}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
+                      >
                         <option value="Customer">Customer Sourced</option>
                         <option value="Supplier">Supplier Sourced</option>
                       </select>
@@ -2447,7 +2536,7 @@ export default function PurchasesListAndForm({
                             type="button"
                             onClick={() => setCustomerFlow("existing")}
                             className={cn(
-                              "px-2.5 py-1 text-xs font-bold rounded-md transition-all",
+                              "px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer",
                               customerFlow === "existing" ? "bg-amber-700 text-white shadow-sm" : "text-amber-800 hover:bg-amber-200/50"
                             )}
                           >
@@ -2455,10 +2544,7 @@ export default function PurchasesListAndForm({
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setCustomerFlow("new");
-                              setShowCustomerModal(true);
-                            }}
+                            onClick={() => setCustomerFlow("new")}
                             className={cn(
                               "px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer",
                               customerFlow === "new" ? "bg-amber-700 text-white shadow-sm" : "text-amber-800 hover:bg-amber-200/50"
@@ -2482,39 +2568,102 @@ export default function PurchasesListAndForm({
                               className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-slate-700"
                             >
                               <option value="">-- Choose Customer (Seller) --</option>
-                              {customers
-                                .filter((c) => !c.isDeleted)
-                                .map((c) => (
-                                  <option key={c.id || c.customer_id} value={c.id || c.customer_id}>
-                                    {c.id || c.customer_id} - {c.name || c.customer_name} ({c.mobile || c.customer_mobile || "No Mobile"})
-                                  </option>
-                                ))}
+                              {availableCustomers.map((c) => (
+                                <option key={c.id || c.customer_id} value={c.id || c.customer_id}>
+                                  {c.id || c.customer_id} - {c.name || c.customer_name} ({c.mobile || c.customer_mobile || "No Mobile"}) {c.branch ? `[${c.branch}]` : ""}
+                                </option>
+                              ))}
                             </select>
+                            {availableCustomers.length === 0 && (
+                              <p className="text-[11px] text-amber-700 mt-1">No customers found. Click <strong>+ Direct Add Customer</strong> above to create one instantly.</p>
+                            )}
                           </div>
                         ) : (
-                          <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-300 col-span-2 shadow-sm text-center">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">Direct Customer Entry</span>
-                              <span className="text-[10px] text-amber-700 font-medium">Full customer profile form with documents & photo verification</span>
-                            </div>
-                            <p className="text-xs text-slate-600 font-medium my-2">
-                              Create a new customer lead with all 16 fields (Aadhaar, PAN, Photos, Location Master) and link directly to this purchase.
-                            </p>
-                            <div className="flex justify-center gap-2 pt-1">
+                          <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-300 col-span-2 shadow-sm text-left">
+                            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                              <div>
+                                <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider block">Direct Customer Entry (Seller)</span>
+                                <span className="text-[10px] text-amber-700 font-medium">Quick add seller or open full 16-field KYC verification</span>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => setCustomerFlow("existing")}
-                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
                               >
-                                Cancel
+                                Existing Customer List
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setShowCustomerModal(true)}
-                                className="px-5 py-2 bg-amber-600 text-white rounded-xl font-bold text-xs hover:bg-amber-700 shadow-md transition-all cursor-pointer flex items-center gap-2"
-                              >
-                                <Plus size={16} /> Open Customer Entry Form
-                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Full Name *</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Ramesh Kumar"
+                                  value={newCustomerName}
+                                  onChange={(e) => setNewCustomerName(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Mobile Number (10 digits) *</label>
+                                <input
+                                  type="tel"
+                                  maxLength={10}
+                                  placeholder="9876543210"
+                                  value={newCustomerMobile}
+                                  onChange={(e) => setNewCustomerMobile(e.target.value.replace(/\D/g, ""))}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">City Profile</label>
+                                <select
+                                  value={newCustomerCity}
+                                  onChange={(e) => setNewCustomerCity(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+                                >
+                                  <option value="">-- Choose City --</option>
+                                  {cities.map((c) => (
+                                    <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">Address / Area</label>
+                                <input
+                                  type="text"
+                                  placeholder="Area, Street or Door No."
+                                  value={newCustomerAddress}
+                                  onChange={(e) => setNewCustomerAddress(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-100">
+                              <p className="text-[10px] text-slate-500">
+                                Fill name & mobile to link immediately, or open full form for KYC docs (Aadhaar/PAN/Photos).
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCustomerModal(true)}
+                                  className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Plus size={14} /> Full KYC Profile
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleQuickAddCustomer}
+                                  className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Check size={14} /> + Link Customer Now
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )
@@ -3771,6 +3920,7 @@ export default function PurchasesListAndForm({
         onClose={() => setShowCustomerModal(false)}
         currentUser={currentUser}
         defaultType="Sell"
+        selectedBranch={selectedBranch}
         onSuccess={(savedCustomer) => {
           const normalized = {
             id: savedCustomer.customer_id || savedCustomer.id,

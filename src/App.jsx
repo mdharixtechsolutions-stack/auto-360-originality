@@ -1683,6 +1683,8 @@ export default function App() {
           areas={areas}
           subAreas={subAreas}
           customers={branchFilteredCustomers}
+          allCustomers={customers}
+          branches={branches}
           suppliers={suppliers}
           onUpdateDeals={setDeals}
           onUpdateCustomers={setCustomers}
@@ -1742,6 +1744,8 @@ export default function App() {
           deals={branchFilteredDeals}
           vehicles={branchFilteredVehicles}
           customers={branchFilteredCustomers}
+          allCustomers={customers}
+          branches={branches}
           suppliers={suppliers}
           vouchers={voucherEntries}
           payments={payments}

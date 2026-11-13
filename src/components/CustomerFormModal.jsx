@@ -8,7 +8,8 @@ export default function CustomerFormModal({
   onSuccess,
   editingCustomer = null,
   currentUser = null,
-  defaultType = "Buy"
+  defaultType = "Buy",
+  selectedBranch = "all"
 }) {
   const [formType, setFormType] = useState(defaultType);
   const [formId, setFormId] = useState("");
@@ -232,7 +233,7 @@ export default function CustomerFormModal({
       customer_status: formStatus,
       preferred_vehicle: formPreferredVehicle,
       remarks_notes: formRemarks,
-      branch: currentUser?.branch || "Coimbatore"
+      branch: (selectedBranch && selectedBranch !== "all" ? selectedBranch : "") || currentUser?.branch || "Tiruppur"
     };
 
     try {
